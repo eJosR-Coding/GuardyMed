@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from apps.api.app.domain.scheduling.entities import (
+    ChangeRequest,
     Department,
     SchedulePeriod,
     ShiftAssignment,
@@ -17,6 +18,8 @@ class InMemorySchedulingRepository:
         self.periods: dict[str, SchedulePeriod] = {}
         self.assignments: dict[str, ShiftAssignment] = {}
         self.assignments_by_period: dict[str, list[str]] = defaultdict(list)
+        self.change_requests: dict[str, ChangeRequest] = {}
+        self.requests_by_assignment: dict[str, list[str]] = defaultdict(list)
 
     def create_department(self, department: Department) -> Department:
         self.departments[department.id] = department
@@ -57,3 +60,15 @@ class InMemorySchedulingRepository:
 
     def list_assignments_for_period(self, period_id: str) -> list[ShiftAssignment]:
         return [self.assignments[item_id] for item_id in self.assignments_by_period[period_id]]
+
+    def create_change_request(self, change_request: ChangeRequest) -> ChangeRequest:
+        self.change_requests[change_request.id] = change_request
+        self.requests_by_assignment[change_request.assignment_id].append(change_request.id)
+        return change_request
+
+    def get_change_request(self, request_id: str) -> ChangeRequest | None:
+        return self.change_requests.get(request_id)
+
+    def update_change_request(self, change_request: ChangeRequest) -> ChangeRequest:
+        self.change_requests[change_request.id] = change_request
+        return change_request

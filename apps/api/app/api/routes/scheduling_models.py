@@ -5,6 +5,7 @@ from datetime import date, time
 from pydantic import BaseModel, ConfigDict
 
 from apps.api.app.domain.scheduling.entities import AssignmentType, SchedulePeriodStatus
+from apps.api.app.domain.scheduling.entities import ChangeRequestStatus, ChangeRequestType
 
 
 class DepartmentCreate(BaseModel):
@@ -77,6 +78,29 @@ class ShiftAssignmentRead(BaseModel):
     start_time: time
     end_time: time
     notes: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChangeRequestCreate(BaseModel):
+    requested_by: str
+    request_type: ChangeRequestType
+    reason: str
+    replacement_worker_id: str | None = None
+
+
+class ChangeRequestUpdate(BaseModel):
+    status: ChangeRequestStatus
+
+
+class ChangeRequestRead(BaseModel):
+    id: str
+    assignment_id: str
+    requested_by: str
+    request_type: ChangeRequestType
+    reason: str
+    status: ChangeRequestStatus
+    replacement_worker_id: str | None
 
     model_config = ConfigDict(from_attributes=True)
 

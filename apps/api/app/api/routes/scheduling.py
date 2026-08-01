@@ -1,6 +1,9 @@
 from fastapi import APIRouter, status
 
 from apps.api.app.api.routes.scheduling_models import (
+    ChangeRequestCreate,
+    ChangeRequestRead,
+    ChangeRequestUpdate,
     DepartmentCreate,
     DepartmentRead,
     ScheduleCalendarRead,
@@ -104,3 +107,30 @@ async def update_shift_assignment(assignment_id: str, payload: ShiftAssignmentUp
 async def get_schedule_calendar(period_id: str) -> ScheduleCalendarRead:
     calendar = service.get_calendar(period_id)
     return ScheduleCalendarRead.model_validate(calendar)
+
+
+@router.post(
+    "/assignments/{assignment_id}/change-requests",
+    response_model=ChangeRequestRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_change_request(assignment_id: str, payload: ChangeRequestCreate) -> ChangeRequestRead:
+    change_request = service.create_change_request(
+        assignment_id=assignment_id,
+        requested_by=payload.requested_by,
+        request_type=payload.request_type,
+        reason=payload.reason,
+        replacement_worker_id=payload.replacement_worker_id,
+    )
+    return ChangeRequestRead.model_validate(change_request)
+
+
+@router.get("/change-requests/{request_id}", response_model=ChangeRequestRead)
+async def get_change_request(request_id: str) -> ChangeRequestRead:
+    return ChangeRequestRead.model_validate(service.get_change_request(request_id))
+
+
+@router.patch("/change-requests/{request_id}", response_model=ChangeRequestRead)
+async def update_change_request(request_id: str, payload: ChangeRequestUpdate) -> ChangeRequestRead:
+    change_request = service.update_change_request_status(request_id, status_value=payload.status)
+    return ChangeRequestRead.model_validate(change_request)
