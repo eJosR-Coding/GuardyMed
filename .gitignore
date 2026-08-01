@@ -6,6 +6,7 @@ __pycache__/
 .mypy_cache/
 .DS_Store
 guardymed.egg-info/
+*.egg-info/
 dist/
 build/
 htmlcov/
@@ -16,4 +17,3 @@ apps/web/dist/
 legacy/django-demo/db.sqlite3
 legacy/django-demo/__pycache__/
 legacy/django-demo/guardymed.egg-info/
-
