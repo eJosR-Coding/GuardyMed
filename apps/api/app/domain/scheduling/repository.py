@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from apps.api.app.domain.scheduling.entities import (
     ApprovalDecision,
+    AuditEvent,
     ChangeRequest,
     Department,
     SchedulePeriod,
@@ -22,6 +23,8 @@ class InMemorySchedulingRepository:
         self.change_requests: dict[str, ChangeRequest] = {}
         self.requests_by_assignment: dict[str, list[str]] = defaultdict(list)
         self.approval_decisions: dict[str, ApprovalDecision] = {}
+        self.audit_events: dict[str, AuditEvent] = {}
+        self.audit_events_by_entity: dict[tuple[str, str], list[str]] = defaultdict(list)
 
     def create_department(self, department: Department) -> Department:
         self.departments[department.id] = department
@@ -78,3 +81,21 @@ class InMemorySchedulingRepository:
     def create_approval_decision(self, approval_decision: ApprovalDecision) -> ApprovalDecision:
         self.approval_decisions[approval_decision.id] = approval_decision
         return approval_decision
+
+    def create_audit_event(self, audit_event: AuditEvent) -> AuditEvent:
+        self.audit_events[audit_event.id] = audit_event
+        self.audit_events_by_entity[(audit_event.entity_type, audit_event.entity_id)].append(audit_event.id)
+        return audit_event
+
+    def list_audit_events(
+        self,
+        *,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+    ) -> list[AuditEvent]:
+        if entity_type and entity_id:
+            ids = self.audit_events_by_entity[(entity_type, entity_id)]
+            return [self.audit_events[item_id] for item_id in ids]
+        events = list(self.audit_events.values())
+        events.sort(key=lambda item: item.created_at)
+        return events

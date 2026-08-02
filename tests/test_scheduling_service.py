@@ -104,6 +104,7 @@ def test_app_routes_are_registered() -> None:
     assert "/api/v1/scheduling/assignments/{assignment_id}/change-requests" in paths
     assert "/api/v1/scheduling/review-queue" in paths
     assert "/api/v1/scheduling/approval-decisions" in paths
+    assert "/api/v1/scheduling/audit-events" in paths
 
 
 def test_create_and_cancel_change_request() -> None:
@@ -297,3 +298,71 @@ def test_reject_schedule_period_returns_to_draft() -> None:
 
     updated_period = service.get_period(period.id)
     assert updated_period.status == SchedulePeriodStatus.DRAFT
+
+
+def test_audit_events_are_recorded_for_core_flow() -> None:
+    service = build_service()
+
+    department = service.create_department(name="Emergency", code="ER")
+    worker = service.create_worker(
+        full_name="Ada Lovelace",
+        document_id="12345678",
+        worker_type="nurse",
+        department_id=department.id,
+    )
+    period = service.create_period(
+        year=2026,
+        month=8,
+        department_id=department.id,
+        created_by="coordinator_1",
+    )
+    assignment = service.create_assignment(
+        period_id=period.id,
+        worker_id=worker.id,
+        assignment_type=AssignmentType.GUARD_SHIFT,
+        shift_date=date(2026, 8, 3),
+        start_time=time(8, 0),
+        end_time=time(20, 0),
+        notes="day shift",
+    )
+    change_request = service.create_change_request(
+        assignment_id=assignment.id,
+        requested_by=worker.id,
+        request_type=ChangeRequestType.SWAP,
+        reason="Need a swap",
+        replacement_worker_id=None,
+    )
+
+    events = service.list_audit_events()
+    assignment_events = service.list_audit_events(entity_type="assignment", entity_id=assignment.id)
+    request_events = service.list_audit_events(entity_type="change_request", entity_id=change_request.id)
+
+    assert len(events) >= 5
+    assert any(event.action == "assignment.created" for event in assignment_events)
+    assert any(event.action == "change_request.created" for event in request_events)
+
+
+def test_audit_events_capture_approval_side_effects() -> None:
+    service = build_service()
+
+    department = service.create_department(name="Emergency", code="ER")
+    period = service.create_period(
+        year=2026,
+        month=8,
+        department_id=department.id,
+        created_by="coordinator_1",
+    )
+    service.update_period_status(period.id, status_value=SchedulePeriodStatus.IN_REVIEW)
+    decision = service.create_approval_decision(
+        target_type=ApprovalTargetType.SCHEDULE_PERIOD,
+        target_id=period.id,
+        decision=ApprovalDecisionType.APPROVED,
+        decided_by="approver_1",
+        comment="approved",
+    )
+
+    period_events = service.list_audit_events(entity_type="schedule_period", entity_id=period.id)
+    decision_events = service.list_audit_events(entity_type="approval_decision", entity_id=decision.id)
+
+    assert any(event.action == "schedule_period.status_updated" for event in period_events)
+    assert any(event.action == "approval_decision.created" for event in decision_events)
