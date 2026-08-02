@@ -3,6 +3,7 @@ from fastapi import APIRouter, status
 from apps.api.app.api.routes.scheduling_models import (
     ApprovalDecisionCreate,
     ApprovalDecisionRead,
+    AuditEventRead,
     ChangeRequestCreate,
     ChangeRequestRead,
     ChangeRequestUpdate,
@@ -156,3 +157,9 @@ async def create_approval_decision(payload: ApprovalDecisionCreate) -> ApprovalD
         comment=payload.comment,
     )
     return ApprovalDecisionRead.model_validate(decision)
+
+
+@router.get("/audit-events", response_model=list[AuditEventRead])
+async def list_audit_events(entity_type: str | None = None, entity_id: str | None = None) -> list[AuditEventRead]:
+    events = service.list_audit_events(entity_type=entity_type, entity_id=entity_id)
+    return [AuditEventRead.model_validate(item) for item in events]

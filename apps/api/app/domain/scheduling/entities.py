@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, time
+from datetime import date, datetime, time
 from enum import StrEnum
 
 
@@ -99,6 +99,17 @@ class ApprovalDecision:
     decision: ApprovalDecisionType
     decided_by: str
     comment: str | None = None
+
+
+@dataclass(slots=True)
+class AuditEvent:
+    id: str
+    actor_id: str
+    entity_type: str
+    entity_id: str
+    action: str
+    payload: dict[str, object]
+    created_at: datetime
 
 
 @dataclass(slots=True)

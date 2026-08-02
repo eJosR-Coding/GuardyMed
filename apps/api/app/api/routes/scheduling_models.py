@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict
 
@@ -132,6 +132,18 @@ class ApprovalDecisionRead(BaseModel):
 class ReviewQueueRead(BaseModel):
     schedule_periods: list[SchedulePeriodRead]
     change_requests: list[ChangeRequestRead]
+
+
+class AuditEventRead(BaseModel):
+    id: str
+    actor_id: str
+    entity_type: str
+    entity_id: str
+    action: str
+    payload: dict[str, object]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScheduleCalendarRead(BaseModel):
