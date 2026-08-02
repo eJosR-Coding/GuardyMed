@@ -89,7 +89,7 @@ class ShiftAssignmentRead(BaseModel):
 
 
 class ChangeRequestCreate(BaseModel):
-    requested_by: str
+    requested_by: str | None = None
     request_type: ChangeRequestType
     reason: str
     replacement_worker_id: str | None = None
@@ -115,7 +115,7 @@ class ApprovalDecisionCreate(BaseModel):
     target_type: ApprovalTargetType
     target_id: str
     decision: ApprovalDecisionType
-    decided_by: str
+    decided_by: str | None = None
     comment: str | None = None
 
 
@@ -149,7 +149,7 @@ class AuditEventRead(BaseModel):
 
 class ExportCreate(BaseModel):
     export_type: ExportType
-    created_by: str
+    created_by: str | None = None
 
 
 class ExportRead(BaseModel):

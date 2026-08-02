@@ -1,5 +1,6 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
+from apps.api.app.api.auth import AuthContext, UserRole, get_auth_context, require_roles
 from apps.api.app.api.routes.scheduling_models import (
     ApprovalDecisionCreate,
     ApprovalDecisionRead,
@@ -46,12 +47,18 @@ async def scheduling_capabilities() -> dict[str, object]:
 
 
 @router.post("/departments", response_model=DepartmentRead, status_code=status.HTTP_201_CREATED)
-async def create_department(payload: DepartmentCreate) -> DepartmentRead:
+async def create_department(
+    payload: DepartmentCreate,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
+) -> DepartmentRead:
     return DepartmentRead.model_validate(service.create_department(name=payload.name, code=payload.code))
 
 
 @router.post("/workers", response_model=WorkerRead, status_code=status.HTTP_201_CREATED)
-async def create_worker(payload: WorkerCreate) -> WorkerRead:
+async def create_worker(
+    payload: WorkerCreate,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
+) -> WorkerRead:
     worker = service.create_worker(
         full_name=payload.full_name,
         document_id=payload.document_id,
@@ -62,23 +69,33 @@ async def create_worker(payload: WorkerCreate) -> WorkerRead:
 
 
 @router.post("/schedule-periods", response_model=SchedulePeriodRead, status_code=status.HTTP_201_CREATED)
-async def create_schedule_period(payload: SchedulePeriodCreate) -> SchedulePeriodRead:
+async def create_schedule_period(
+    payload: SchedulePeriodCreate,
+    auth: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
+) -> SchedulePeriodRead:
     period = service.create_period(
         year=payload.year,
         month=payload.month,
         department_id=payload.department_id,
-        created_by=payload.created_by,
+        created_by=payload.created_by or auth.user_id,
     )
     return SchedulePeriodRead.model_validate(period)
 
 
 @router.get("/schedule-periods/{period_id}", response_model=SchedulePeriodRead)
-async def get_schedule_period(period_id: str) -> SchedulePeriodRead:
+async def get_schedule_period(
+    period_id: str,
+    _: AuthContext = Depends(get_auth_context),
+) -> SchedulePeriodRead:
     return SchedulePeriodRead.model_validate(service.get_period(period_id))
 
 
 @router.patch("/schedule-periods/{period_id}", response_model=SchedulePeriodRead)
-async def update_schedule_period(period_id: str, payload: SchedulePeriodUpdate) -> SchedulePeriodRead:
+async def update_schedule_period(
+    period_id: str,
+    payload: SchedulePeriodUpdate,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
+) -> SchedulePeriodRead:
     return SchedulePeriodRead.model_validate(service.update_period_status(period_id, status_value=payload.status))
 
 
@@ -87,7 +104,11 @@ async def update_schedule_period(period_id: str, payload: SchedulePeriodUpdate) 
     response_model=ShiftAssignmentRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_shift_assignment(period_id: str, payload: ShiftAssignmentCreate) -> ShiftAssignmentRead:
+async def create_shift_assignment(
+    period_id: str,
+    payload: ShiftAssignmentCreate,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
+) -> ShiftAssignmentRead:
     assignment = service.create_assignment(
         period_id=period_id,
         worker_id=payload.worker_id,
@@ -101,7 +122,11 @@ async def create_shift_assignment(period_id: str, payload: ShiftAssignmentCreate
 
 
 @router.patch("/assignments/{assignment_id}", response_model=ShiftAssignmentRead)
-async def update_shift_assignment(assignment_id: str, payload: ShiftAssignmentUpdate) -> ShiftAssignmentRead:
+async def update_shift_assignment(
+    assignment_id: str,
+    payload: ShiftAssignmentUpdate,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
+) -> ShiftAssignmentRead:
     assignment = service.update_assignment(
         assignment_id,
         start_time=payload.start_time,
@@ -112,7 +137,10 @@ async def update_shift_assignment(assignment_id: str, payload: ShiftAssignmentUp
 
 
 @router.get("/schedule-periods/{period_id}/calendar", response_model=ScheduleCalendarRead)
-async def get_schedule_calendar(period_id: str) -> ScheduleCalendarRead:
+async def get_schedule_calendar(
+    period_id: str,
+    _: AuthContext = Depends(get_auth_context),
+) -> ScheduleCalendarRead:
     calendar = service.get_calendar(period_id)
     return ScheduleCalendarRead.model_validate(calendar)
 
@@ -122,10 +150,14 @@ async def get_schedule_calendar(period_id: str) -> ScheduleCalendarRead:
     response_model=ChangeRequestRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_change_request(assignment_id: str, payload: ChangeRequestCreate) -> ChangeRequestRead:
+async def create_change_request(
+    assignment_id: str,
+    payload: ChangeRequestCreate,
+    auth: AuthContext = Depends(require_roles(UserRole.WORKER)),
+) -> ChangeRequestRead:
     change_request = service.create_change_request(
         assignment_id=assignment_id,
-        requested_by=payload.requested_by,
+        requested_by=payload.requested_by or auth.user_id,
         request_type=payload.request_type,
         reason=payload.reason,
         replacement_worker_id=payload.replacement_worker_id,
@@ -134,56 +166,82 @@ async def create_change_request(assignment_id: str, payload: ChangeRequestCreate
 
 
 @router.get("/change-requests/{request_id}", response_model=ChangeRequestRead)
-async def get_change_request(request_id: str) -> ChangeRequestRead:
+async def get_change_request(
+    request_id: str,
+    _: AuthContext = Depends(get_auth_context),
+) -> ChangeRequestRead:
     return ChangeRequestRead.model_validate(service.get_change_request(request_id))
 
 
 @router.patch("/change-requests/{request_id}", response_model=ChangeRequestRead)
-async def update_change_request(request_id: str, payload: ChangeRequestUpdate) -> ChangeRequestRead:
+async def update_change_request(
+    request_id: str,
+    payload: ChangeRequestUpdate,
+    auth: AuthContext = Depends(get_auth_context),
+) -> ChangeRequestRead:
     change_request = service.update_change_request_status(request_id, status_value=payload.status)
     return ChangeRequestRead.model_validate(change_request)
 
 
 @router.get("/review-queue", response_model=ReviewQueueRead)
-async def get_review_queue() -> ReviewQueueRead:
+async def get_review_queue(
+    _: AuthContext = Depends(require_roles(UserRole.APPROVER)),
+) -> ReviewQueueRead:
     queue = service.list_review_queue()
     return ReviewQueueRead.model_validate(queue)
 
 
 @router.post("/approval-decisions", response_model=ApprovalDecisionRead, status_code=status.HTTP_201_CREATED)
-async def create_approval_decision(payload: ApprovalDecisionCreate) -> ApprovalDecisionRead:
+async def create_approval_decision(
+    payload: ApprovalDecisionCreate,
+    auth: AuthContext = Depends(require_roles(UserRole.APPROVER)),
+) -> ApprovalDecisionRead:
     decision = service.create_approval_decision(
         target_type=payload.target_type,
         target_id=payload.target_id,
         decision=payload.decision,
-        decided_by=payload.decided_by,
+        decided_by=payload.decided_by or auth.user_id,
         comment=payload.comment,
     )
     return ApprovalDecisionRead.model_validate(decision)
 
 
 @router.get("/audit-events", response_model=list[AuditEventRead])
-async def list_audit_events(entity_type: str | None = None, entity_id: str | None = None) -> list[AuditEventRead]:
+async def list_audit_events(
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR, UserRole.APPROVER)),
+) -> list[AuditEventRead]:
     events = service.list_audit_events(entity_type=entity_type, entity_id=entity_id)
     return [AuditEventRead.model_validate(item) for item in events]
 
 
 @router.post("/schedule-periods/{period_id}/exports", response_model=ExportRead, status_code=status.HTTP_201_CREATED)
-async def create_export(period_id: str, payload: ExportCreate) -> ExportRead:
+async def create_export(
+    period_id: str,
+    payload: ExportCreate,
+    auth: AuthContext = Depends(require_roles(UserRole.COORDINATOR, UserRole.APPROVER)),
+) -> ExportRead:
     export_job = service.create_export(
         period_id=period_id,
         export_type=payload.export_type,
-        created_by=payload.created_by,
+        created_by=payload.created_by or auth.user_id,
     )
     return ExportRead.model_validate(export_job)
 
 
 @router.get("/schedule-periods/{period_id}/exports", response_model=list[ExportRead])
-async def list_exports_for_period(period_id: str) -> list[ExportRead]:
+async def list_exports_for_period(
+    period_id: str,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR, UserRole.APPROVER)),
+) -> list[ExportRead]:
     exports = service.list_exports_for_period(period_id)
     return [ExportRead.model_validate(item) for item in exports]
 
 
 @router.get("/exports/{export_id}", response_model=ExportRead)
-async def get_export(export_id: str) -> ExportRead:
+async def get_export(
+    export_id: str,
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR, UserRole.APPROVER)),
+) -> ExportRead:
     return ExportRead.model_validate(service.get_export(export_id))
