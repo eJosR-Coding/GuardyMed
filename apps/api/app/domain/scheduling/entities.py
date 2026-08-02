@@ -18,6 +18,20 @@ class AssignmentType(StrEnum):
     ON_CALL = "on_call"
 
 
+class ChangeRequestType(StrEnum):
+    SWAP = "swap"
+    REPLACEMENT = "replacement"
+    INCIDENT = "incident"
+    ADJUSTMENT = "adjustment"
+
+
+class ChangeRequestStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+
 @dataclass(slots=True)
 class Department:
     id: str
@@ -54,6 +68,17 @@ class ShiftAssignment:
     start_time: time
     end_time: time
     notes: str | None = None
+
+
+@dataclass(slots=True)
+class ChangeRequest:
+    id: str
+    assignment_id: str
+    requested_by: str
+    request_type: ChangeRequestType
+    reason: str
+    status: ChangeRequestStatus = ChangeRequestStatus.PENDING
+    replacement_worker_id: str | None = None
 
 
 @dataclass(slots=True)

@@ -7,6 +7,9 @@ from fastapi import HTTPException, status
 
 from apps.api.app.domain.scheduling.entities import (
     AssignmentType,
+    ChangeRequest,
+    ChangeRequestStatus,
+    ChangeRequestType,
     Department,
     ScheduleCalendar,
     SchedulePeriod,
@@ -126,6 +129,52 @@ class SchedulingService:
         assignments = self.repository.list_assignments_for_period(period_id)
         assignments.sort(key=lambda item: (item.shift_date, item.start_time, item.worker_id))
         return ScheduleCalendar(period=period, assignments=assignments)
+
+    def create_change_request(
+        self,
+        *,
+        assignment_id: str,
+        requested_by: str,
+        request_type: ChangeRequestType,
+        reason: str,
+        replacement_worker_id: str | None,
+    ) -> ChangeRequest:
+        assignment = self.repository.get_assignment(assignment_id)
+        if assignment is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assignment not found")
+        if not reason.strip():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="reason is required")
+        if replacement_worker_id is not None:
+            self._require_worker(replacement_worker_id)
+        change_request = ChangeRequest(
+            id=self._new_id("cr"),
+            assignment_id=assignment.id,
+            requested_by=requested_by,
+            request_type=request_type,
+            reason=reason.strip(),
+            replacement_worker_id=replacement_worker_id,
+        )
+        return self.repository.create_change_request(change_request)
+
+    def get_change_request(self, request_id: str) -> ChangeRequest:
+        change_request = self.repository.get_change_request(request_id)
+        if change_request is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="change request not found")
+        return change_request
+
+    def update_change_request_status(
+        self,
+        request_id: str,
+        *,
+        status_value: ChangeRequestStatus,
+    ) -> ChangeRequest:
+        change_request = self.get_change_request(request_id)
+        if change_request.status != ChangeRequestStatus.PENDING:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="only pending change requests can be updated")
+        if status_value not in {ChangeRequestStatus.CANCELLED, ChangeRequestStatus.APPROVED, ChangeRequestStatus.REJECTED}:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid change request status transition")
+        change_request.status = status_value
+        return self.repository.update_change_request(change_request)
 
     def _require_department(self, department_id: str) -> Department:
         department = self.repository.get_department(department_id)
