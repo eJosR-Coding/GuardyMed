@@ -7,6 +7,7 @@ from apps.api.app.domain.scheduling.entities import (
     AuditEvent,
     ChangeRequest,
     Department,
+    ExportJob,
     SchedulePeriod,
     ShiftAssignment,
     Worker,
@@ -25,6 +26,8 @@ class InMemorySchedulingRepository:
         self.approval_decisions: dict[str, ApprovalDecision] = {}
         self.audit_events: dict[str, AuditEvent] = {}
         self.audit_events_by_entity: dict[tuple[str, str], list[str]] = defaultdict(list)
+        self.exports: dict[str, ExportJob] = {}
+        self.exports_by_period: dict[str, list[str]] = defaultdict(list)
 
     def create_department(self, department: Department) -> Department:
         self.departments[department.id] = department
@@ -99,3 +102,15 @@ class InMemorySchedulingRepository:
         events = list(self.audit_events.values())
         events.sort(key=lambda item: item.created_at)
         return events
+
+    def create_export(self, export_job: ExportJob) -> ExportJob:
+        self.exports[export_job.id] = export_job
+        self.exports_by_period[export_job.schedule_period_id].append(export_job.id)
+        return export_job
+
+    def get_export(self, export_id: str) -> ExportJob | None:
+        return self.exports.get(export_id)
+
+    def list_exports_for_period(self, period_id: str) -> list[ExportJob]:
+        ids = self.exports_by_period[period_id]
+        return [self.exports[item_id] for item_id in ids]

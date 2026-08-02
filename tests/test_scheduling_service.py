@@ -6,6 +6,7 @@ from apps.api.app.domain.scheduling.entities import (
     AssignmentType,
     ChangeRequestStatus,
     ChangeRequestType,
+    ExportType,
     SchedulePeriodStatus,
 )
 from apps.api.app.domain.scheduling.repository import InMemorySchedulingRepository
@@ -105,6 +106,8 @@ def test_app_routes_are_registered() -> None:
     assert "/api/v1/scheduling/review-queue" in paths
     assert "/api/v1/scheduling/approval-decisions" in paths
     assert "/api/v1/scheduling/audit-events" in paths
+    assert "/api/v1/scheduling/schedule-periods/{period_id}/exports" in paths
+    assert "/api/v1/scheduling/exports/{export_id}" in paths
 
 
 def test_create_and_cancel_change_request() -> None:
@@ -366,3 +369,75 @@ def test_audit_events_capture_approval_side_effects() -> None:
 
     assert any(event.action == "schedule_period.status_updated" for event in period_events)
     assert any(event.action == "approval_decision.created" for event in decision_events)
+
+
+def test_create_and_fetch_export_for_approved_period() -> None:
+    service = build_service()
+
+    department = service.create_department(name="Emergency", code="ER")
+    worker = service.create_worker(
+        full_name="Ada Lovelace",
+        document_id="12345678",
+        worker_type="nurse",
+        department_id=department.id,
+    )
+    period = service.create_period(
+        year=2026,
+        month=8,
+        department_id=department.id,
+        created_by="coordinator_1",
+    )
+    service.create_assignment(
+        period_id=period.id,
+        worker_id=worker.id,
+        assignment_type=AssignmentType.GUARD_SHIFT,
+        shift_date=date(2026, 8, 3),
+        start_time=time(8, 0),
+        end_time=time(20, 0),
+        notes="day shift",
+    )
+    service.update_period_status(period.id, status_value=SchedulePeriodStatus.IN_REVIEW)
+    service.create_approval_decision(
+        target_type=ApprovalTargetType.SCHEDULE_PERIOD,
+        target_id=period.id,
+        decision=ApprovalDecisionType.APPROVED,
+        decided_by="approver_1",
+        comment="approved",
+    )
+
+    export_job = service.create_export(
+        period_id=period.id,
+        export_type=ExportType.OPERATIONAL_SUMMARY,
+        created_by="admin_1",
+    )
+    fetched_export = service.get_export(export_job.id)
+    period_exports = service.list_exports_for_period(period.id)
+
+    assert fetched_export.id == export_job.id
+    assert export_job.export_type == ExportType.OPERATIONAL_SUMMARY
+    assert "assignments=1" in export_job.content
+    assert len(period_exports) == 1
+
+
+def test_export_requires_approved_period() -> None:
+    service = build_service()
+
+    department = service.create_department(name="Emergency", code="ER")
+    period = service.create_period(
+        year=2026,
+        month=8,
+        department_id=department.id,
+        created_by="coordinator_1",
+    )
+
+    try:
+        service.create_export(
+            period_id=period.id,
+            export_type=ExportType.COMPLIANCE_REPORT,
+            created_by="admin_1",
+        )
+    except Exception as exc:  # ponytail: FastAPI HTTPException is enough until domain errors exist
+        assert getattr(exc, "status_code", None) == 409
+        assert getattr(exc, "detail", None) == "schedule period must be approved before export"
+    else:
+        raise AssertionError("expected export creation to fail")
