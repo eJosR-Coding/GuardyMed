@@ -178,6 +178,12 @@ class SchedulingService:
         )
         return updated
 
+    def get_assignment(self, assignment_id: str) -> ShiftAssignment:
+        assignment = self.repository.get_assignment(assignment_id)
+        if assignment is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assignment not found")
+        return assignment
+
     def get_calendar(self, period_id: str) -> ScheduleCalendar:
         period = self.get_period(period_id)
         assignments = self.repository.list_assignments_for_period(period_id)
