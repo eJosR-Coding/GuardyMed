@@ -24,6 +24,18 @@ from apps.api.app.domain.scheduling.entities import (
     Worker,
 )
 from apps.api.app.domain.scheduling.repository import InMemorySchedulingRepository
+from apps.api.app.domain.scheduling.rules import (
+    SYSTEM_ACTOR_ID,
+    AuditAction,
+    build_export_lines,
+    next_change_request_status_from_decision,
+    next_schedule_period_status_from_decision,
+    require_pending_change_request,
+    validate_change_request_status_transition,
+    validate_exportable_period,
+    validate_month,
+    validate_time_window,
+)
 
 
 class SchedulingService:
@@ -34,10 +46,10 @@ class SchedulingService:
         department = Department(id=self._new_id("dep"), name=name, code=code)
         created = self.repository.create_department(department)
         self._record_event(
-            actor_id="system",
+            actor_id=SYSTEM_ACTOR_ID,
             entity_type="department",
             entity_id=created.id,
-            action="department.created",
+            action=AuditAction.DEPARTMENT_CREATED,
             payload={"name": created.name, "code": created.code},
         )
         return created
@@ -60,10 +72,10 @@ class SchedulingService:
         )
         created = self.repository.create_worker(worker)
         self._record_event(
-            actor_id="system",
+            actor_id=SYSTEM_ACTOR_ID,
             entity_type="worker",
             entity_id=created.id,
-            action="worker.created",
+            action=AuditAction.WORKER_CREATED,
             payload={"department_id": created.department_id, "worker_type": created.worker_type},
         )
         return created
@@ -77,8 +89,7 @@ class SchedulingService:
         created_by: str | None,
     ) -> SchedulePeriod:
         self._require_department(department_id)
-        if month < 1 or month > 12:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="month must be between 1 and 12")
+        validate_month(month)
         period = SchedulePeriod(
             id=self._new_id("sp"),
             year=year,
@@ -88,10 +99,10 @@ class SchedulingService:
         )
         created = self.repository.create_period(period)
         self._record_event(
-            actor_id=created_by or "system",
+            actor_id=created_by or SYSTEM_ACTOR_ID,
             entity_type="schedule_period",
             entity_id=created.id,
-            action="schedule_period.created",
+            action=AuditAction.SCHEDULE_PERIOD_CREATED,
             payload={"year": created.year, "month": created.month, "department_id": created.department_id},
         )
         return created
@@ -107,10 +118,10 @@ class SchedulingService:
         period.status = status_value
         updated = self.repository.update_period(period)
         self._record_event(
-            actor_id="system",
+            actor_id=SYSTEM_ACTOR_ID,
             entity_type="schedule_period",
             entity_id=updated.id,
-            action="schedule_period.status_updated",
+            action=AuditAction.SCHEDULE_PERIOD_STATUS_UPDATED,
             payload={"status": updated.status},
         )
         return updated
@@ -130,8 +141,7 @@ class SchedulingService:
         worker = self._require_worker(worker_id)
         if worker.department_id != period.department_id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="worker does not belong to the schedule department")
-        if end_time <= start_time:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="end_time must be after start_time")
+        validate_time_window(start_time=start_time, end_time=end_time)
         assignment = ShiftAssignment(
             id=self._new_id("asg"),
             schedule_period_id=period_id,
@@ -144,10 +154,10 @@ class SchedulingService:
         )
         created = self.repository.create_assignment(assignment)
         self._record_event(
-            actor_id="system",
+            actor_id=SYSTEM_ACTOR_ID,
             entity_type="assignment",
             entity_id=created.id,
-            action="assignment.created",
+            action=AuditAction.ASSIGNMENT_CREATED,
             payload={"schedule_period_id": created.schedule_period_id, "worker_id": created.worker_id},
         )
         return created
@@ -163,17 +173,16 @@ class SchedulingService:
         assignment = self.repository.get_assignment(assignment_id)
         if assignment is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assignment not found")
-        if end_time <= start_time:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="end_time must be after start_time")
+        validate_time_window(start_time=start_time, end_time=end_time)
         assignment.start_time = start_time
         assignment.end_time = end_time
         assignment.notes = notes
         updated = self.repository.update_assignment(assignment)
         self._record_event(
-            actor_id="system",
+            actor_id=SYSTEM_ACTOR_ID,
             entity_type="assignment",
             entity_id=updated.id,
-            action="assignment.updated",
+            action=AuditAction.ASSIGNMENT_UPDATED,
             payload={"start_time": str(updated.start_time), "end_time": str(updated.end_time), "notes": updated.notes},
         )
         return updated
@@ -219,7 +228,7 @@ class SchedulingService:
             actor_id=created.requested_by,
             entity_type="change_request",
             entity_id=created.id,
-            action="change_request.created",
+            action=AuditAction.CHANGE_REQUEST_CREATED,
             payload={"assignment_id": created.assignment_id, "request_type": created.request_type},
         )
         return created
@@ -237,17 +246,15 @@ class SchedulingService:
         status_value: ChangeRequestStatus,
     ) -> ChangeRequest:
         change_request = self.get_change_request(request_id)
-        if change_request.status != ChangeRequestStatus.PENDING:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="only pending change requests can be updated")
-        if status_value not in {ChangeRequestStatus.CANCELLED, ChangeRequestStatus.APPROVED, ChangeRequestStatus.REJECTED}:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid change request status transition")
+        require_pending_change_request(change_request.status)
+        validate_change_request_status_transition(status_value)
         change_request.status = status_value
         updated = self.repository.update_change_request(change_request)
         self._record_event(
             actor_id=updated.requested_by,
             entity_type="change_request",
             entity_id=updated.id,
-            action="change_request.status_updated",
+            action=AuditAction.CHANGE_REQUEST_STATUS_UPDATED,
             payload={"status": updated.status},
         )
         return updated
@@ -284,7 +291,7 @@ class SchedulingService:
             actor_id=created.decided_by,
             entity_type="approval_decision",
             entity_id=created.id,
-            action="approval_decision.created",
+            action=AuditAction.APPROVAL_DECISION_CREATED,
             payload={"target_type": created.target_type, "target_id": created.target_id, "decision": created.decision},
         )
         return created
@@ -316,8 +323,7 @@ class SchedulingService:
         created_by: str,
     ) -> ExportJob:
         period = self.get_period(period_id)
-        if period.status not in {SchedulePeriodStatus.APPROVED, SchedulePeriodStatus.CLOSED}:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="schedule period must be approved before export")
+        validate_exportable_period(period.status)
         if not created_by.strip():
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="created_by is required")
 
@@ -336,7 +342,7 @@ class SchedulingService:
             actor_id=created.created_by,
             entity_type="export_job",
             entity_id=created.id,
-            action="export.created",
+            action=AuditAction.EXPORT_CREATED,
             payload={"schedule_period_id": created.schedule_period_id, "export_type": created.export_type},
         )
         return created
@@ -367,30 +373,24 @@ class SchedulingService:
 
     def _apply_schedule_period_decision(self, period_id: str, decision: ApprovalDecisionType) -> None:
         period = self.get_period(period_id)
-        if period.status != SchedulePeriodStatus.IN_REVIEW:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="schedule period must be in_review before approval")
-        period.status = (
-            SchedulePeriodStatus.APPROVED
-            if decision == ApprovalDecisionType.APPROVED
-            else SchedulePeriodStatus.DRAFT
+        period.status = next_schedule_period_status_from_decision(
+            current_status=period.status,
+            decision=decision,
         )
         self.repository.update_period(period)
 
     def _apply_change_request_decision(self, request_id: str, decision: ApprovalDecisionType) -> None:
         change_request = self.get_change_request(request_id)
-        if change_request.status != ChangeRequestStatus.PENDING:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="change request must be pending before approval")
-        change_request.status = (
-            ChangeRequestStatus.APPROVED
-            if decision == ApprovalDecisionType.APPROVED
-            else ChangeRequestStatus.REJECTED
+        change_request.status = next_change_request_status_from_decision(
+            current_status=change_request.status,
+            decision=decision,
         )
         self.repository.update_change_request(change_request)
         self._record_event(
-            actor_id="system",
+            actor_id=SYSTEM_ACTOR_ID,
             entity_type="change_request",
             entity_id=change_request.id,
-            action="change_request.reviewed",
+            action=AuditAction.CHANGE_REQUEST_REVIEWED,
             payload={"status": change_request.status},
         )
 
@@ -423,13 +423,14 @@ class SchedulingService:
     ) -> str:
         assignment_count = len(assignments)
         worker_count = len({item.worker_id for item in assignments})
-        lines = [
-            f"export_type={export_type}",
-            f"period={period.year}-{period.month:02d}",
-            f"department_id={period.department_id}",
-            f"assignments={assignment_count}",
-            f"workers={worker_count}",
-        ]
+        lines = build_export_lines(
+            export_type=export_type,
+            year=period.year,
+            month=period.month,
+            department_id=period.department_id,
+            assignment_count=assignment_count,
+            worker_count=worker_count,
+        )
         return "\n".join(lines)
 
     @staticmethod

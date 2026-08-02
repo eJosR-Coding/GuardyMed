@@ -1,6 +1,7 @@
 .venv/
 .env
 __pycache__/
+guardymed.db
 *.pyc
 .pytest_cache/
 .ruff_cache/
