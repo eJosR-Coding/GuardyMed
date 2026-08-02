@@ -32,6 +32,16 @@ class ChangeRequestStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class ApprovalTargetType(StrEnum):
+    SCHEDULE_PERIOD = "schedule_period"
+    CHANGE_REQUEST = "change_request"
+
+
+class ApprovalDecisionType(StrEnum):
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 @dataclass(slots=True)
 class Department:
     id: str
@@ -79,6 +89,16 @@ class ChangeRequest:
     reason: str
     status: ChangeRequestStatus = ChangeRequestStatus.PENDING
     replacement_worker_id: str | None = None
+
+
+@dataclass(slots=True)
+class ApprovalDecision:
+    id: str
+    target_type: ApprovalTargetType
+    target_id: str
+    decision: ApprovalDecisionType
+    decided_by: str
+    comment: str | None = None
 
 
 @dataclass(slots=True)

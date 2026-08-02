@@ -6,6 +6,9 @@ from uuid import uuid4
 from fastapi import HTTPException, status
 
 from apps.api.app.domain.scheduling.entities import (
+    ApprovalDecision,
+    ApprovalDecisionType,
+    ApprovalTargetType,
     AssignmentType,
     ChangeRequest,
     ChangeRequestStatus,
@@ -176,6 +179,46 @@ class SchedulingService:
         change_request.status = status_value
         return self.repository.update_change_request(change_request)
 
+    def create_approval_decision(
+        self,
+        *,
+        target_type: ApprovalTargetType,
+        target_id: str,
+        decision: ApprovalDecisionType,
+        decided_by: str,
+        comment: str | None,
+    ) -> ApprovalDecision:
+        if not decided_by.strip():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="decided_by is required")
+
+        if target_type == ApprovalTargetType.SCHEDULE_PERIOD:
+            self._apply_schedule_period_decision(target_id, decision)
+        elif target_type == ApprovalTargetType.CHANGE_REQUEST:
+            self._apply_change_request_decision(target_id, decision)
+        else:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid approval target type")
+
+        approval_decision = ApprovalDecision(
+            id=self._new_id("ad"),
+            target_type=target_type,
+            target_id=target_id,
+            decision=decision,
+            decided_by=decided_by.strip(),
+            comment=comment.strip() if comment else None,
+        )
+        return self.repository.create_approval_decision(approval_decision)
+
+    def list_review_queue(self) -> dict[str, list[object]]:
+        periods = [period for period in self.repository.periods.values() if period.status == SchedulePeriodStatus.IN_REVIEW]
+        requests = [
+            change_request
+            for change_request in self.repository.change_requests.values()
+            if change_request.status == ChangeRequestStatus.PENDING
+        ]
+        periods.sort(key=lambda item: (item.year, item.month, item.id))
+        requests.sort(key=lambda item: item.id)
+        return {"schedule_periods": periods, "change_requests": requests}
+
     def _require_department(self, department_id: str) -> Department:
         department = self.repository.get_department(department_id)
         if department is None:
@@ -187,6 +230,28 @@ class SchedulingService:
         if worker is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="worker not found")
         return worker
+
+    def _apply_schedule_period_decision(self, period_id: str, decision: ApprovalDecisionType) -> None:
+        period = self.get_period(period_id)
+        if period.status != SchedulePeriodStatus.IN_REVIEW:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="schedule period must be in_review before approval")
+        period.status = (
+            SchedulePeriodStatus.APPROVED
+            if decision == ApprovalDecisionType.APPROVED
+            else SchedulePeriodStatus.DRAFT
+        )
+        self.repository.update_period(period)
+
+    def _apply_change_request_decision(self, request_id: str, decision: ApprovalDecisionType) -> None:
+        change_request = self.get_change_request(request_id)
+        if change_request.status != ChangeRequestStatus.PENDING:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="change request must be pending before approval")
+        change_request.status = (
+            ChangeRequestStatus.APPROVED
+            if decision == ApprovalDecisionType.APPROVED
+            else ChangeRequestStatus.REJECTED
+        )
+        self.repository.update_change_request(change_request)
 
     @staticmethod
     def _new_id(prefix: str) -> str:

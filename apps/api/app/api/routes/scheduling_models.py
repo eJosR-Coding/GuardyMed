@@ -5,7 +5,12 @@ from datetime import date, time
 from pydantic import BaseModel, ConfigDict
 
 from apps.api.app.domain.scheduling.entities import AssignmentType, SchedulePeriodStatus
-from apps.api.app.domain.scheduling.entities import ChangeRequestStatus, ChangeRequestType
+from apps.api.app.domain.scheduling.entities import (
+    ApprovalDecisionType,
+    ApprovalTargetType,
+    ChangeRequestStatus,
+    ChangeRequestType,
+)
 
 
 class DepartmentCreate(BaseModel):
@@ -103,6 +108,30 @@ class ChangeRequestRead(BaseModel):
     replacement_worker_id: str | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ApprovalDecisionCreate(BaseModel):
+    target_type: ApprovalTargetType
+    target_id: str
+    decision: ApprovalDecisionType
+    decided_by: str
+    comment: str | None = None
+
+
+class ApprovalDecisionRead(BaseModel):
+    id: str
+    target_type: ApprovalTargetType
+    target_id: str
+    decision: ApprovalDecisionType
+    decided_by: str
+    comment: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReviewQueueRead(BaseModel):
+    schedule_periods: list[SchedulePeriodRead]
+    change_requests: list[ChangeRequestRead]
 
 
 class ScheduleCalendarRead(BaseModel):
