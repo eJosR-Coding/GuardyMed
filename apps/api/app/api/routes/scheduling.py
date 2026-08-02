@@ -1,6 +1,8 @@
 from fastapi import APIRouter, status
 
 from apps.api.app.api.routes.scheduling_models import (
+    ApprovalDecisionCreate,
+    ApprovalDecisionRead,
     ChangeRequestCreate,
     ChangeRequestRead,
     ChangeRequestUpdate,
@@ -10,6 +12,7 @@ from apps.api.app.api.routes.scheduling_models import (
     SchedulePeriodCreate,
     SchedulePeriodRead,
     SchedulePeriodUpdate,
+    ReviewQueueRead,
     ShiftAssignmentCreate,
     ShiftAssignmentRead,
     ShiftAssignmentUpdate,
@@ -31,6 +34,7 @@ async def scheduling_capabilities() -> dict[str, object]:
             "workers",
             "assignments",
             "requests",
+            "approvals",
             "rules",
             "audit",
         ],
@@ -134,3 +138,21 @@ async def get_change_request(request_id: str) -> ChangeRequestRead:
 async def update_change_request(request_id: str, payload: ChangeRequestUpdate) -> ChangeRequestRead:
     change_request = service.update_change_request_status(request_id, status_value=payload.status)
     return ChangeRequestRead.model_validate(change_request)
+
+
+@router.get("/review-queue", response_model=ReviewQueueRead)
+async def get_review_queue() -> ReviewQueueRead:
+    queue = service.list_review_queue()
+    return ReviewQueueRead.model_validate(queue)
+
+
+@router.post("/approval-decisions", response_model=ApprovalDecisionRead, status_code=status.HTTP_201_CREATED)
+async def create_approval_decision(payload: ApprovalDecisionCreate) -> ApprovalDecisionRead:
+    decision = service.create_approval_decision(
+        target_type=payload.target_type,
+        target_id=payload.target_id,
+        decision=payload.decision,
+        decided_by=payload.decided_by,
+        comment=payload.comment,
+    )
+    return ApprovalDecisionRead.model_validate(decision)
