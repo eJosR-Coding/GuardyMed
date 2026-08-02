@@ -15,6 +15,8 @@ from apps.api.app.domain.scheduling.entities import (
     ChangeRequestStatus,
     ChangeRequestType,
     Department,
+    ExportJob,
+    ExportType,
     ScheduleCalendar,
     SchedulePeriod,
     SchedulePeriodStatus,
@@ -300,6 +302,51 @@ class SchedulingService:
     ) -> list[AuditEvent]:
         return self.repository.list_audit_events(entity_type=entity_type, entity_id=entity_id)
 
+    def create_export(
+        self,
+        *,
+        period_id: str,
+        export_type: ExportType,
+        created_by: str,
+    ) -> ExportJob:
+        period = self.get_period(period_id)
+        if period.status not in {SchedulePeriodStatus.APPROVED, SchedulePeriodStatus.CLOSED}:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="schedule period must be approved before export")
+        if not created_by.strip():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="created_by is required")
+
+        assignments = self.repository.list_assignments_for_period(period_id)
+        content = self._build_export_content(period=period, assignments=assignments, export_type=export_type)
+        export_job = ExportJob(
+            id=self._new_id("exp"),
+            schedule_period_id=period.id,
+            export_type=export_type,
+            created_by=created_by.strip(),
+            content=content,
+            created_at=datetime.now(timezone.utc),
+        )
+        created = self.repository.create_export(export_job)
+        self._record_event(
+            actor_id=created.created_by,
+            entity_type="export_job",
+            entity_id=created.id,
+            action="export.created",
+            payload={"schedule_period_id": created.schedule_period_id, "export_type": created.export_type},
+        )
+        return created
+
+    def get_export(self, export_id: str) -> ExportJob:
+        export_job = self.repository.get_export(export_id)
+        if export_job is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="export not found")
+        return export_job
+
+    def list_exports_for_period(self, period_id: str) -> list[ExportJob]:
+        self.get_period(period_id)
+        exports = self.repository.list_exports_for_period(period_id)
+        exports.sort(key=lambda item: item.created_at)
+        return exports
+
     def _require_department(self, department_id: str) -> Department:
         department = self.repository.get_department(department_id)
         if department is None:
@@ -360,6 +407,24 @@ class SchedulingService:
             created_at=datetime.now(timezone.utc),
         )
         return self.repository.create_audit_event(event)
+
+    def _build_export_content(
+        self,
+        *,
+        period: SchedulePeriod,
+        assignments: list[ShiftAssignment],
+        export_type: ExportType,
+    ) -> str:
+        assignment_count = len(assignments)
+        worker_count = len({item.worker_id for item in assignments})
+        lines = [
+            f"export_type={export_type}",
+            f"period={period.year}-{period.month:02d}",
+            f"department_id={period.department_id}",
+            f"assignments={assignment_count}",
+            f"workers={worker_count}",
+        ]
+        return "\n".join(lines)
 
     @staticmethod
     def _new_id(prefix: str) -> str:

@@ -42,6 +42,12 @@ class ApprovalDecisionType(StrEnum):
     REJECTED = "rejected"
 
 
+class ExportType(StrEnum):
+    OPERATIONAL_SUMMARY = "operational_summary"
+    PAYROLL_SUMMARY = "payroll_summary"
+    COMPLIANCE_REPORT = "compliance_report"
+
+
 @dataclass(slots=True)
 class Department:
     id: str
@@ -109,6 +115,16 @@ class AuditEvent:
     entity_id: str
     action: str
     payload: dict[str, object]
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class ExportJob:
+    id: str
+    schedule_period_id: str
+    export_type: ExportType
+    created_by: str
+    content: str
     created_at: datetime
 
 

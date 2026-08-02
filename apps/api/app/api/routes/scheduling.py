@@ -9,6 +9,8 @@ from apps.api.app.api.routes.scheduling_models import (
     ChangeRequestUpdate,
     DepartmentCreate,
     DepartmentRead,
+    ExportCreate,
+    ExportRead,
     ScheduleCalendarRead,
     SchedulePeriodCreate,
     SchedulePeriodRead,
@@ -38,6 +40,7 @@ async def scheduling_capabilities() -> dict[str, object]:
             "approvals",
             "rules",
             "audit",
+            "exports",
         ],
     }
 
@@ -163,3 +166,24 @@ async def create_approval_decision(payload: ApprovalDecisionCreate) -> ApprovalD
 async def list_audit_events(entity_type: str | None = None, entity_id: str | None = None) -> list[AuditEventRead]:
     events = service.list_audit_events(entity_type=entity_type, entity_id=entity_id)
     return [AuditEventRead.model_validate(item) for item in events]
+
+
+@router.post("/schedule-periods/{period_id}/exports", response_model=ExportRead, status_code=status.HTTP_201_CREATED)
+async def create_export(period_id: str, payload: ExportCreate) -> ExportRead:
+    export_job = service.create_export(
+        period_id=period_id,
+        export_type=payload.export_type,
+        created_by=payload.created_by,
+    )
+    return ExportRead.model_validate(export_job)
+
+
+@router.get("/schedule-periods/{period_id}/exports", response_model=list[ExportRead])
+async def list_exports_for_period(period_id: str) -> list[ExportRead]:
+    exports = service.list_exports_for_period(period_id)
+    return [ExportRead.model_validate(item) for item in exports]
+
+
+@router.get("/exports/{export_id}", response_model=ExportRead)
+async def get_export(export_id: str) -> ExportRead:
+    return ExportRead.model_validate(service.get_export(export_id))

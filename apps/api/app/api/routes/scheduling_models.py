@@ -10,6 +10,7 @@ from apps.api.app.domain.scheduling.entities import (
     ApprovalTargetType,
     ChangeRequestStatus,
     ChangeRequestType,
+    ExportType,
 )
 
 
@@ -141,6 +142,22 @@ class AuditEventRead(BaseModel):
     entity_id: str
     action: str
     payload: dict[str, object]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExportCreate(BaseModel):
+    export_type: ExportType
+    created_by: str
+
+
+class ExportRead(BaseModel):
+    id: str
+    schedule_period_id: str
+    export_type: ExportType
+    created_by: str
+    content: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
