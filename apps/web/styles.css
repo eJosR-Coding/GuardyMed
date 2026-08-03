@@ -1,19 +1,20 @@
 :root {
   color-scheme: light;
-  --bg: oklch(1 0 0);
-  --surface: oklch(0.978 0.004 286);
-  --surface-strong: oklch(0.95 0.008 286);
-  --ink: oklch(0.23 0.02 286);
-  --muted: oklch(0.52 0.02 286);
-  --line: oklch(0.89 0.01 286);
-  --primary: oklch(0.53 0.125 294.3);
-  --primary-strong: oklch(0.46 0.13 294.3);
-  --accent: oklch(0.63 0.11 248);
-  --success: oklch(0.68 0.14 150);
-  --warning: oklch(0.75 0.15 92);
-  --danger: oklch(0.6 0.18 25);
+  --bg: oklch(0.992 0.003 286);
+  --surface: oklch(0.976 0.006 286);
+  --surface-strong: oklch(0.952 0.01 286);
+  --ink: oklch(0.24 0.02 286);
+  --muted: oklch(0.5 0.02 286);
+  --line: oklch(0.89 0.008 286);
+  --line-strong: oklch(0.82 0.014 286);
+  --primary: oklch(0.55 0.12 287);
+  --primary-strong: oklch(0.47 0.13 287);
+  --success: oklch(0.67 0.14 153);
+  --warning: oklch(0.77 0.15 92);
+  --danger: oklch(0.61 0.18 25);
+  --info: oklch(0.64 0.11 245);
   --radius: 14px;
-  --shadow: 0 8px 24px rgba(37, 24, 56, 0.08);
+  --shadow: 0 10px 28px rgba(33, 24, 49, 0.06);
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -21,10 +22,11 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   min-height: 100%;
-  background: var(--bg);
+  background: linear-gradient(180deg, oklch(0.986 0.005 286), oklch(0.994 0.002 286));
   color: var(--ink);
   font-family: var(--font);
 }
@@ -46,14 +48,21 @@ button {
 
 .shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 340px minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .sidebar {
   padding: 24px;
+  background: color-mix(in oklab, var(--surface) 92%, white);
   border-right: 1px solid var(--line);
-  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.content {
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -61,8 +70,9 @@ button {
 
 .brand h1,
 .hero h2,
+.panel h2,
 .panel h3,
-.panel h2 {
+.panel h4 {
   margin: 0;
 }
 
@@ -71,21 +81,39 @@ button {
   margin: 0;
 }
 
+.brand h1 {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 .muted {
   color: var(--muted);
 }
 
+.form-hint {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+}
+
 .panel,
-.status-card {
-  background: var(--bg);
+.status-card,
+.overview-card,
+.hero-note {
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
+
+.panel,
+.overview-card,
+.hero-note {
   box-shadow: var(--shadow);
 }
 
@@ -97,40 +125,87 @@ button {
   padding: 16px;
 }
 
-.content {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
   gap: 20px;
+  align-items: stretch;
 }
 
-.hero {
+.hero-copy {
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
 }
 
 .hero h2 {
   font-size: 2rem;
-  line-height: 1.1;
-  margin-bottom: 8px;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.hero-side {
+  display: grid;
+  gap: 12px;
 }
 
 .status-card {
-  min-width: 220px;
   padding: 16px;
   display: flex;
-  align-items: center;
   gap: 12px;
+  align-items: center;
 }
 
 .status-dot {
   width: 12px;
   height: 12px;
+  flex: 0 0 auto;
   border-radius: 999px;
   background: var(--success);
-  flex: 0 0 auto;
+}
+
+.hero-note {
+  padding: 14px 16px;
+}
+
+.hero-note strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.section-heading.with-margin {
+  margin-top: 18px;
+}
+
+.overview-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.overview-card {
+  padding: 14px 16px;
+}
+
+.overview-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.overview-card strong {
+  display: block;
+  font-size: 1.1rem;
 }
 
 .nav {
@@ -142,18 +217,12 @@ button {
 .nav-link,
 .secondary,
 .primary {
-  border: 1px solid var(--line);
   border-radius: 12px;
+  border: 1px solid var(--line);
   padding: 10px 14px;
-  background: var(--bg);
   color: var(--ink);
+  background: white;
   transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
-}
-
-.nav-link.active {
-  background: color-mix(in oklab, var(--primary) 10%, var(--bg));
-  border-color: color-mix(in oklab, var(--primary) 40%, var(--line));
-  color: var(--primary-strong);
 }
 
 .primary {
@@ -172,9 +241,21 @@ button {
   background: var(--surface);
 }
 
+.nav-link.active {
+  background: color-mix(in oklab, var(--primary) 10%, white);
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--line));
+  color: var(--primary-strong);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .grid {
@@ -186,15 +267,16 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .row {
   display: grid;
   gap: 12px;
+}
+
+.row.two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.row.three-up {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -202,7 +284,7 @@ label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 0.94rem;
+  font-size: 0.92rem;
 }
 
 input,
@@ -212,8 +294,13 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 10px 12px;
-  background: var(--bg);
+  background: white;
   color: var(--ink);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: oklch(0.45 0.018 286);
 }
 
 input:focus,
@@ -225,15 +312,85 @@ button:focus {
 }
 
 .panel-header,
-.toolbar {
+.toolbar,
+.actions {
   display: flex;
-  gap: 12px;
-  justify-content: space-between;
+  gap: 10px;
   align-items: center;
 }
 
-.toolbar {
+.panel-header {
+  justify-content: space-between;
+}
+
+.toolbar,
+.actions {
   flex-wrap: wrap;
+}
+
+.actions.stretch {
+  align-items: stretch;
+}
+
+.actions.stretch button {
+  flex: 1 1 100%;
+}
+
+.workflow-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workflow-step {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface) 75%, white);
+}
+
+.workflow-step strong,
+.role-card strong,
+.account-card strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.workflow-step p,
+.role-card p,
+.account-card span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.step-index {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary) 10%, white);
+  color: var(--primary-strong);
+  font-size: 0.78rem;
+}
+
+.role-guide,
+.account-list {
+  display: grid;
+  gap: 10px;
+}
+
+.role-card,
+.account-card {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+}
+
+.role-card.active {
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--line));
+  background: color-mix(in oklab, var(--primary) 8%, white);
 }
 
 .list {
@@ -250,7 +407,7 @@ button:focus {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 14px;
-  background: var(--surface);
+  background: color-mix(in oklab, var(--surface) 78%, white);
 }
 
 .item-header {
@@ -265,46 +422,60 @@ button:focus {
   font-size: 1rem;
 }
 
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  font-size: 0.78rem;
-  background: color-mix(in oklab, var(--primary) 12%, white);
+  background: color-mix(in oklab, var(--primary) 10%, white);
   color: var(--primary-strong);
+  font-size: 0.78rem;
 }
 
 .badge.warning {
-  background: color-mix(in oklab, var(--warning) 16%, white);
-  color: oklch(0.4 0.1 92);
+  background: color-mix(in oklab, var(--warning) 14%, white);
+  color: oklch(0.41 0.09 92);
 }
 
 .badge.success {
   background: color-mix(in oklab, var(--success) 14%, white);
-  color: oklch(0.42 0.11 150);
+  color: oklch(0.42 0.11 153);
 }
 
 .badge.danger {
   background: color-mix(in oklab, var(--danger) 12%, white);
-  color: oklch(0.44 0.12 25);
+  color: oklch(0.43 0.12 25);
 }
 
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 0.9rem;
+.summary-banner {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  font-size: 0.94rem;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+.summary-banner-muted {
+  background: color-mix(in oklab, var(--surface) 85%, white);
+}
+
+.summary-banner-info {
+  background: color-mix(in oklab, var(--info) 10%, white);
+  border-color: color-mix(in oklab, var(--info) 25%, var(--line));
+}
+
+.summary-banner-warning {
+  background: color-mix(in oklab, var(--warning) 10%, white);
+  border-color: color-mix(in oklab, var(--warning) 25%, var(--line));
 }
 
 .view {
@@ -321,39 +492,40 @@ button:focus {
   margin: 0;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  background: white;
 }
 
 .flash.success {
-  background: color-mix(in oklab, var(--success) 12%, white);
-  border-color: color-mix(in oklab, var(--success) 30%, var(--line));
+  background: color-mix(in oklab, var(--success) 10%, white);
+  border-color: color-mix(in oklab, var(--success) 28%, var(--line));
 }
 
 .flash.error {
-  background: color-mix(in oklab, var(--danger) 10%, white);
-  border-color: color-mix(in oklab, var(--danger) 30%, var(--line));
+  background: color-mix(in oklab, var(--danger) 9%, white);
+  border-color: color-mix(in oklab, var(--danger) 26%, var(--line));
 }
 
 .empty {
-  padding: 24px;
-  border: 1px dashed var(--line);
+  padding: 26px 18px;
+  border: 1px dashed var(--line-strong);
   border-radius: 12px;
   color: var(--muted);
   text-align: center;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 pre {
   margin: 10px 0 0;
   padding: 12px;
   border-radius: 10px;
-  background: oklch(0.97 0.003 286);
+  background: oklch(0.975 0.004 286);
   overflow-x: auto;
   white-space: pre-wrap;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1220px) {
   .shell {
     grid-template-columns: 1fr;
   }
@@ -363,17 +535,23 @@ pre {
     border-bottom: 1px solid var(--line);
   }
 
+  .hero,
   .grid.two,
-  .row {
+  .overview-panel,
+  .workflow-strip,
+  .row.two-up,
+  .row.three-up {
     grid-template-columns: 1fr;
   }
 
-  .hero {
-    flex-direction: column;
+  .status-card,
+  .hero-note {
+    width: 100%;
   }
 
-  .status-card {
-    width: 100%;
+  .stack-on-mobile {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

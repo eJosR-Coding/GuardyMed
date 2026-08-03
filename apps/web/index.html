@@ -11,88 +11,222 @@
       <aside class="sidebar">
         <div class="brand">
           <p class="eyebrow">GuardyMed</p>
-          <h1>Shift operations MVP</h1>
-          <p class="muted">Monthly scheduling, worker requests, approval, audit and exports.</p>
+          <h1>Hospital shift operations</h1>
+          <p class="muted">
+            A focused MVP for monthly guard scheduling, worker requests, approvals, and audit evidence.
+          </p>
         </div>
 
         <section class="panel compact">
-          <h2>Session</h2>
-          <label>
-            Role
-            <select id="session-role">
-              <option value="coordinator">Coordinator</option>
-              <option value="worker">Worker</option>
-              <option value="approver">Approver</option>
-            </select>
-          </label>
-          <label>
-            User id
-            <input id="session-user-id" type="text" value="coord_demo" />
-          </label>
-          <button id="apply-session" class="primary">Apply session</button>
-          <button id="load-demo" class="secondary" type="button">Load demo data</button>
-          <p id="session-summary" class="muted"></p>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Session</p>
+              <h2>Sign in</h2>
+            </div>
+            <span id="session-chip" class="badge">Guest</span>
+          </div>
+
+          <div class="stack">
+            <label>
+              Email
+              <input id="login-email" type="email" value="coord@guardymed.local" />
+            </label>
+            <label>
+              Password
+              <input id="login-password" type="password" value="password123" />
+            </label>
+          </div>
+
+          <div class="actions stretch">
+            <button id="login-button" class="primary" type="button">Log in</button>
+            <button id="load-demo" class="secondary" type="button">Load demo data</button>
+            <button id="logout-button" class="secondary" type="button" hidden>Log out</button>
+          </div>
+
+          <p id="session-summary" class="muted">
+            Load demo data first, then sign in with one of the role accounts below.
+          </p>
+
+          <div class="account-list">
+            <div class="account-card">
+              <strong>Coordinator</strong>
+              <span>coord@guardymed.local</span>
+            </div>
+            <div class="account-card">
+              <strong>Worker</strong>
+              <span>worker@guardymed.local</span>
+            </div>
+            <div class="account-card">
+              <strong>Approver</strong>
+              <span>approver@guardymed.local</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel compact">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Who uses this</p>
+              <h2>Roles</h2>
+            </div>
+          </div>
+
+          <div class="role-guide">
+            <article class="role-card" data-role-card="coordinator">
+              <strong>Coordinator</strong>
+              <p>Builds the monthly roster, assigns staff, and sends the period for review.</p>
+            </article>
+            <article class="role-card" data-role-card="worker">
+              <strong>Worker</strong>
+              <p>Checks assigned shifts, reports issues, and requests swaps or replacements.</p>
+            </article>
+            <article class="role-card" data-role-card="approver">
+              <strong>Approver</strong>
+              <p>Validates periods, reviews worker requests, and checks the audit trail.</p>
+            </article>
+          </div>
         </section>
 
         <nav class="nav">
-          <button class="nav-link active" data-view="coordinator">Coordinator workspace</button>
-          <button class="nav-link" data-view="worker">Worker workspace</button>
-          <button class="nav-link" data-view="approver">Approver workspace</button>
+          <button class="nav-link active" data-view="coordinator" hidden>Coordinator workspace</button>
+          <button class="nav-link" data-view="worker" hidden>Worker workspace</button>
+          <button class="nav-link" data-view="approver" hidden>Approver workspace</button>
         </nav>
       </aside>
 
       <main class="content">
         <header class="hero">
-          <div>
-            <p class="eyebrow">Current workspace</p>
-            <h2 id="hero-title">Coordinator workspace</h2>
+          <div class="hero-copy">
+            <p id="hero-kicker" class="eyebrow">Current workspace</p>
+            <h2 id="hero-title">Choose a role and start</h2>
             <p id="hero-copy" class="muted">
-              Create the month, register staff, assign shifts, then send the period to review.
+              This demo is organized by role. Each person sees a different operational workflow.
             </p>
           </div>
-          <div class="status-card">
-            <span class="status-dot"></span>
-            <div>
-              <strong id="status-role">coordinator</strong>
-              <p id="status-user" class="muted">coord_demo</p>
+
+          <div class="hero-side">
+            <div class="status-card">
+              <span class="status-dot"></span>
+              <div>
+                <strong id="status-role">guest</strong>
+                <p id="status-user" class="muted">not logged in</p>
+              </div>
+            </div>
+
+            <div class="hero-note">
+              <strong id="hero-note-title">What happens here</strong>
+              <p id="hero-note-copy" class="muted">
+                Coordinators create the month, workers request changes, approvers validate and export.
+              </p>
             </div>
           </div>
         </header>
 
         <p id="flash" class="flash" hidden></p>
 
+        <section id="overview-panel" class="overview-panel">
+          <div class="overview-card">
+            <span class="overview-label">Departments</span>
+            <strong id="summary-departments">0</strong>
+          </div>
+          <div class="overview-card">
+            <span class="overview-label">Workers</span>
+            <strong id="summary-workers">0</strong>
+          </div>
+          <div class="overview-card">
+            <span class="overview-label">Periods</span>
+            <strong id="summary-periods">0</strong>
+          </div>
+          <div class="overview-card">
+            <span class="overview-label">Selected period</span>
+            <strong id="summary-selected-period">None</strong>
+          </div>
+        </section>
+
         <section id="view-coordinator" class="view active">
+          <section class="panel">
+            <div class="panel-header stack-on-mobile">
+              <div>
+                <h3>Coordinator workflow</h3>
+                <p class="muted">
+                  The coordinator owns the monthly setup. First create the structure, then fill the period, then send it to review.
+                </p>
+              </div>
+            </div>
+            <div class="workflow-strip">
+              <article class="workflow-step">
+                <span class="step-index">Step 1</span>
+                <strong>Create department</strong>
+                <p>Define the service that owns the roster, for example Emergency or ICU.</p>
+              </article>
+              <article class="workflow-step">
+                <span class="step-index">Step 2</span>
+                <strong>Register workers</strong>
+                <p>Add staff members and link each one to a department.</p>
+              </article>
+              <article class="workflow-step">
+                <span class="step-index">Step 3</span>
+                <strong>Create period</strong>
+                <p>Open the month that will be scheduled.</p>
+              </article>
+              <article class="workflow-step">
+                <span class="step-index">Step 4</span>
+                <strong>Assign shifts</strong>
+                <p>Populate the calendar and send the period to approval.</p>
+              </article>
+            </div>
+          </section>
+
           <div class="grid two">
             <section class="panel">
-              <h3>1. Register department</h3>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Setup</p>
+                  <h3>Register department</h3>
+                </div>
+              </div>
+              <p class="muted form-hint">
+                Demo data already includes <strong>Emergency (ER)</strong>. Create a different one, for example
+                <strong>ICU</strong> or <strong>Pediatrics</strong>.
+              </p>
               <form id="department-form" class="stack">
                 <label>
                   Department name
-                  <input name="name" type="text" placeholder="Emergency" required />
+                  <input name="name" type="text" placeholder="Intensive Care Unit" required />
                 </label>
                 <label>
-                  Code
-                  <input name="code" type="text" placeholder="ER" required />
+                  Department code
+                  <input name="code" type="text" placeholder="ICU" required />
                 </label>
                 <button class="primary" type="submit">Create department</button>
               </form>
             </section>
 
             <section class="panel">
-              <h3>2. Register worker</h3>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Setup</p>
+                  <h3>Register worker</h3>
+                </div>
+              </div>
+              <p class="muted form-hint">
+                Document IDs must be unique. Demo data already includes three workers in Emergency.
+              </p>
               <form id="worker-form" class="stack">
                 <label>
                   Full name
                   <input name="full_name" type="text" placeholder="Ana Ruiz" required />
                 </label>
-                <label>
-                  Document id
-                  <input name="document_id" type="text" placeholder="12345678" required />
-                </label>
-                <label>
-                  Worker type
-                  <input name="worker_type" type="text" placeholder="Nurse" required />
-                </label>
+                <div class="row two-up">
+                  <label>
+                    Document ID
+                    <input name="document_id" type="text" placeholder="12345678" required />
+                  </label>
+                  <label>
+                    Worker type
+                    <input name="worker_type" type="text" placeholder="Nurse" required />
+                  </label>
+                </div>
                 <label>
                   Department
                   <select name="department_id" id="worker-department-select" required></select>
@@ -104,9 +238,17 @@
 
           <div class="grid two">
             <section class="panel">
-              <h3>3. Create schedule period</h3>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Month setup</p>
+                  <h3>Create schedule period</h3>
+                </div>
+              </div>
+              <p class="muted form-hint">
+                Demo data already includes <strong>August 2026</strong> for Emergency. Use a different month or another department.
+              </p>
               <form id="period-form" class="stack">
-                <div class="row">
+                <div class="row two-up">
                   <label>
                     Year
                     <input name="year" type="number" min="2024" max="2035" value="2026" required />
@@ -125,10 +267,18 @@
             </section>
 
             <section class="panel">
-              <h3>4. Create assignment</h3>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Month setup</p>
+                  <h3>Create assignment</h3>
+                </div>
+              </div>
+              <p class="muted form-hint">
+                Assignments only work on draft periods, and workers must belong to the same department as the selected period.
+              </p>
               <form id="assignment-form" class="stack">
                 <label>
-                  Period
+                  Schedule period
                   <select name="period_id" id="assignment-period-select" required></select>
                 </label>
                 <label>
@@ -143,17 +293,17 @@
                     <option value="on_call">On call</option>
                   </select>
                 </label>
-                <div class="row">
+                <div class="row three-up">
                   <label>
                     Shift date
                     <input name="shift_date" type="date" required />
                   </label>
                   <label>
-                    Start
+                    Start time
                     <input name="start_time" type="time" required />
                   </label>
                   <label>
-                    End
+                    End time
                     <input name="end_time" type="time" required />
                   </label>
                 </div>
@@ -168,26 +318,62 @@
 
           <div class="grid two">
             <section class="panel">
-              <div class="panel-header">
+              <div class="section-heading">
                 <div>
-                  <h3>Periods</h3>
-                  <p class="muted">Select a period to inspect the calendar and exports.</p>
+                  <p class="eyebrow">Attendance scaffold</p>
+                  <h3>Enroll worker for attendance</h3>
                 </div>
-                <button id="refresh-periods" class="secondary">Refresh</button>
               </div>
-              <div id="period-list" class="list"></div>
+              <p class="muted form-hint">
+                Phase 1 keeps attendance manual. Enroll the worker first, then they can submit check-in or check-out evidence.
+              </p>
+              <form id="attendance-enrollment-form" class="stack">
+                <label>
+                  Worker
+                  <select id="attendance-enrollment-worker-select" required></select>
+                </label>
+                <button class="primary" type="submit">Create attendance enrollment</button>
+              </form>
             </section>
 
             <section class="panel">
               <div class="panel-header">
                 <div>
-                  <h3>Calendar</h3>
-                  <p id="calendar-title" class="muted">Pick a period from the left.</p>
+                  <h3>Attendance enrollments</h3>
+                  <p class="muted">Manual registry of workers allowed to submit attendance attempts.</p>
+                </div>
+              </div>
+              <div id="attendance-enrollment-list" class="list separated"></div>
+            </section>
+          </div>
+
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Available periods</h3>
+                  <p class="muted">
+                    Pick a monthly schedule to inspect its assignments and current status.
+                  </p>
+                </div>
+                <button id="refresh-periods" class="secondary" type="button">Refresh</button>
+              </div>
+              <div id="period-list" class="list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header stack-on-mobile">
+                <div>
+                  <h3>Selected period</h3>
+                  <p id="calendar-title" class="muted">Choose a period from the left to inspect the roster.</p>
                 </div>
                 <div class="toolbar">
-                  <button id="send-review" class="secondary" disabled>Send to review</button>
-                  <button id="create-export" class="secondary" disabled>Create export</button>
+                  <button id="send-review" class="secondary" type="button" disabled>Send to review</button>
+                  <button id="create-export" class="secondary" type="button" disabled>Create export</button>
                 </div>
+              </div>
+              <div id="calendar-summary" class="summary-banner summary-banner-muted">
+                No period selected.
               </div>
               <div id="calendar-list" class="list"></div>
               <div id="export-list" class="list separated"></div>
@@ -196,21 +382,78 @@
         </section>
 
         <section id="view-worker" class="view">
+          <section class="panel">
+            <div class="panel-header stack-on-mobile">
+              <div>
+                <h3>Worker workflow</h3>
+                <p class="muted">
+                  The worker only sees their own assignments. From here they review their schedule and submit an operational request.
+                </p>
+              </div>
+            </div>
+            <div id="worker-summary" class="summary-banner summary-banner-info">
+              Log in as a worker to load your linked roster identity.
+            </div>
+          </section>
+
           <div class="grid two">
             <section class="panel">
-              <h3>My assignments</h3>
-              <form id="worker-context-form" class="stack">
-                <label>
-                  Worker
-                  <select id="worker-self-select" required></select>
-                </label>
-                <button class="primary" type="submit">Load my schedule</button>
-              </form>
+              <div class="panel-header">
+                <div>
+                  <h3>My assignments</h3>
+                  <p class="muted">
+                    These are the guard shifts assigned to the authenticated worker account.
+                  </p>
+                </div>
+                <button id="refresh-worker" class="secondary" type="button">Refresh</button>
+              </div>
               <div id="worker-assignment-list" class="list separated"></div>
             </section>
 
             <section class="panel">
-              <h3>Request change</h3>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Attendance scaffold</p>
+                  <h3>Submit attendance</h3>
+                </div>
+              </div>
+              <p class="muted form-hint">
+                Submit manual evidence against one of your assignments. Approver review stays manual in this MVP.
+              </p>
+              <form id="attendance-attempt-form" class="stack">
+                <label>
+                  Assignment
+                  <select id="attendance-assignment-select" required></select>
+                </label>
+                <label>
+                  Attempt type
+                  <select id="attendance-attempt-type">
+                    <option value="check_in">Check in</option>
+                    <option value="check_out">Check out</option>
+                  </select>
+                </label>
+                <label>
+                  Evidence reference
+                  <input id="attendance-evidence-ref" type="text" placeholder="manual://photo-or-frontdesk-note" />
+                </label>
+                <button class="primary" type="submit">Submit attendance</button>
+              </form>
+              <div class="section-heading with-margin">
+                <div>
+                  <p class="eyebrow">History</p>
+                  <h3>My attendance attempts</h3>
+                </div>
+              </div>
+              <div id="attendance-attempt-list" class="list separated"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Action</p>
+                  <h3>Request a change</h3>
+                </div>
+              </div>
               <form id="change-request-form" class="stack">
                 <label>
                   Assignment
@@ -226,31 +469,51 @@
                   </select>
                 </label>
                 <label>
-                  Replacement worker (optional)
+                  Replacement worker
                   <select id="replacement-worker-select">
                     <option value="">No replacement</option>
                   </select>
                 </label>
                 <label>
                   Reason
-                  <textarea id="change-reason" rows="3" placeholder="Need schedule adjustment" required></textarea>
+                  <textarea id="change-reason" rows="3" placeholder="Explain the issue or requested change" required></textarea>
                 </label>
                 <button class="primary" type="submit">Submit request</button>
               </form>
+              <div class="section-heading with-margin">
+                <div>
+                  <p class="eyebrow">History</p>
+                  <h3>Submitted requests</h3>
+                </div>
+              </div>
               <div id="worker-request-list" class="list separated"></div>
             </section>
           </div>
         </section>
 
         <section id="view-approver" class="view">
+          <section class="panel">
+            <div class="panel-header stack-on-mobile">
+              <div>
+                <h3>Approver workflow</h3>
+                <p class="muted">
+                  The approver validates periods and worker requests, then reviews the audit evidence generated by the system.
+                </p>
+              </div>
+            </div>
+            <div id="approver-summary" class="summary-banner summary-banner-warning">
+              Pending decisions appear in the review queue. Audit events explain what changed and who did it.
+            </div>
+          </section>
+
           <div class="grid two">
             <section class="panel">
               <div class="panel-header">
                 <div>
                   <h3>Review queue</h3>
-                  <p class="muted">Approve or reject periods and worker requests.</p>
+                  <p class="muted">Approve or reject schedule periods, worker requests, and manual attendance attempts.</p>
                 </div>
-                <button id="refresh-queue" class="secondary">Refresh</button>
+                <button id="refresh-queue" class="secondary" type="button">Refresh</button>
               </div>
               <div id="review-queue" class="list separated"></div>
             </section>
@@ -259,9 +522,9 @@
               <div class="panel-header">
                 <div>
                   <h3>Audit trail</h3>
-                  <p class="muted">Operational evidence from the current system state.</p>
+                  <p class="muted">Operational evidence showing who created, changed, reviewed, or exported data.</p>
                 </div>
-                <button id="refresh-audit" class="secondary">Refresh</button>
+                <button id="refresh-audit" class="secondary" type="button">Refresh</button>
               </div>
               <div id="audit-list" class="list separated"></div>
             </section>

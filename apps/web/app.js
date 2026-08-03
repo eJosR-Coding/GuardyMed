@@ -1,45 +1,37 @@
-const SESSION_KEY = "guardymed.demo.session";
-
-const defaultViews = {
-  coordinator: {
-    title: "Coordinator workspace",
-    copy: "Create the month, register staff, assign shifts, then send the period to review.",
-    userId: "coord_demo",
-  },
-  worker: {
-    title: "Worker workspace",
-    copy: "Review personal shifts, then raise a change or incident request against a real assignment.",
-    userId: "worker_demo",
-  },
-  approver: {
-    title: "Approver workspace",
-    copy: "Review pending schedules and requests, then leave an approval decision backed by an audit trail.",
-    userId: "approver_demo",
-  },
-};
-
 const state = {
-  session: loadSession(),
+  session: null,
   departments: [],
   workers: [],
   periods: [],
   selectedPeriodId: "",
-  workerAssignments: [],
-  workerRequests: [],
+  attendanceEnrollments: [],
 };
 
 const els = {
   flash: document.querySelector("#flash"),
-  role: document.querySelector("#session-role"),
-  userId: document.querySelector("#session-user-id"),
-  applySession: document.querySelector("#apply-session"),
+  email: document.querySelector("#login-email"),
+  password: document.querySelector("#login-password"),
+  loginButton: document.querySelector("#login-button"),
   loadDemo: document.querySelector("#load-demo"),
+  logoutButton: document.querySelector("#logout-button"),
   sessionSummary: document.querySelector("#session-summary"),
+  sessionChip: document.querySelector("#session-chip"),
+  heroKicker: document.querySelector("#hero-kicker"),
   heroTitle: document.querySelector("#hero-title"),
   heroCopy: document.querySelector("#hero-copy"),
+  heroNoteTitle: document.querySelector("#hero-note-title"),
+  heroNoteCopy: document.querySelector("#hero-note-copy"),
   statusRole: document.querySelector("#status-role"),
   statusUser: document.querySelector("#status-user"),
+  roleCards: [...document.querySelectorAll("[data-role-card]")],
   navLinks: [...document.querySelectorAll(".nav-link")],
+  summaryDepartments: document.querySelector("#summary-departments"),
+  summaryWorkers: document.querySelector("#summary-workers"),
+  summaryPeriods: document.querySelector("#summary-periods"),
+  summarySelectedPeriod: document.querySelector("#summary-selected-period"),
+  calendarSummary: document.querySelector("#calendar-summary"),
+  workerSummary: document.querySelector("#worker-summary"),
+  approverSummary: document.querySelector("#approver-summary"),
   views: {
     coordinator: document.querySelector("#view-coordinator"),
     worker: document.querySelector("#view-worker"),
@@ -49,6 +41,9 @@ const els = {
   workerForm: document.querySelector("#worker-form"),
   periodForm: document.querySelector("#period-form"),
   assignmentForm: document.querySelector("#assignment-form"),
+  attendanceEnrollmentForm: document.querySelector("#attendance-enrollment-form"),
+  attendanceEnrollmentWorkerSelect: document.querySelector("#attendance-enrollment-worker-select"),
+  attendanceEnrollmentList: document.querySelector("#attendance-enrollment-list"),
   departmentSelects: [
     document.querySelector("#worker-department-select"),
     document.querySelector("#period-department-select"),
@@ -62,11 +57,16 @@ const els = {
   exportList: document.querySelector("#export-list"),
   sendReview: document.querySelector("#send-review"),
   createExport: document.querySelector("#create-export"),
-  workerContextForm: document.querySelector("#worker-context-form"),
-  workerSelfSelect: document.querySelector("#worker-self-select"),
+  refreshWorker: document.querySelector("#refresh-worker"),
   workerAssignmentList: document.querySelector("#worker-assignment-list"),
   changeRequestForm: document.querySelector("#change-request-form"),
   changeAssignmentSelect: document.querySelector("#change-assignment-select"),
+  attendanceAssignmentSelect: document.querySelector("#attendance-assignment-select"),
+  attendanceAttemptForm: document.querySelector("#attendance-attempt-form"),
+  attendanceAttemptType: document.querySelector("#attendance-attempt-type"),
+  attendanceEvidenceRef: document.querySelector("#attendance-evidence-ref"),
+  attendanceAttemptList: document.querySelector("#attendance-attempt-list"),
+  changeRequestType: document.querySelector("#change-request-type"),
   replacementWorkerSelect: document.querySelector("#replacement-worker-select"),
   changeReason: document.querySelector("#change-reason"),
   workerRequestList: document.querySelector("#worker-request-list"),
@@ -76,68 +76,82 @@ const els = {
   auditList: document.querySelector("#audit-list"),
 };
 
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return { role: "coordinator", userId: defaultViews.coordinator.userId };
-    const parsed = JSON.parse(raw);
-    const role = sanitizeRole(parsed.role);
-    const userId = sanitizeUserId(parsed.userId) || defaultViews[role].userId;
-    return { role, userId };
-  } catch {
-    return { role: "coordinator", userId: defaultViews.coordinator.userId };
-  }
-}
-
-function persistSession() {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(state.session));
-}
-
-function sanitizeRole(value) {
-  return value === "worker" || value === "approver" ? value : "coordinator";
-}
-
-function sanitizeUserId(value) {
-  const cleaned = String(value || "")
-    .trim()
-    .replace(/[^a-zA-Z0-9_-]/g, "")
-    .slice(0, 40);
-  return cleaned;
-}
-
-function normalizeText(value, max = 120) {
-  return String(value || "").trim().replace(/\s+/g, " ").slice(0, max);
-}
-
-function authHeaders(role = state.session.role, userId = state.session.userId) {
-  return {
-    "Content-Type": "application/json",
-    "x-user-role": role,
-    "x-user-id": userId,
-  };
-}
+const roleMeta = {
+  guest: {
+    kicker: "Start here",
+    title: "Choose a role and start",
+    copy: "Load demo data, then sign in to see the workflow for that role.",
+    noteTitle: "How this demo is structured",
+    noteCopy:
+      "Coordinator builds the month, worker requests changes, approver validates the roster and reviews evidence.",
+  },
+  coordinator: {
+    kicker: "Coordinator workspace",
+    title: "Build and prepare the monthly roster",
+    copy: "Set up the department, register staff, create the month, assign shifts, and send the period for review.",
+    noteTitle: "Coordinator goal",
+    noteCopy: "You are responsible for assembling the roster and moving the month from draft to review.",
+  },
+  worker: {
+    kicker: "Worker workspace",
+    title: "Review your schedule and request changes",
+    copy: "You only see your own assignments. Use this view to spot issues and submit a swap, replacement, or incident.",
+    noteTitle: "Worker goal",
+    noteCopy: "Read the roster clearly, then send a request linked to a real assignment when something needs to change.",
+  },
+  approver: {
+    kicker: "Approver workspace",
+    title: "Validate the month and the pending requests",
+    copy: "Review periods and worker requests, then confirm or reject them with a tracked decision.",
+    noteTitle: "Approver goal",
+    noteCopy: "You are the control layer: approve what is ready, reject what is incomplete, and inspect the audit trail.",
+  },
+};
 
 async function api(path, options = {}) {
   const response = await fetch(`/api/v1${path}`, {
-    ...options,
+    credentials: "include",
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...authHeaders(),
-      ...(options.headers ?? {}),
+      ...(options.headers || {}),
     },
+    ...options,
   });
 
-  if (!response.ok) {
-    let detail = `${response.status} ${response.statusText}`;
-    try {
-      const data = await response.json();
-      detail = data.detail || detail;
-    } catch {}
-    throw new Error(detail);
-  }
-
   if (response.status === 204) return null;
-  return response.json();
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(humanizeErrorMessage(data.detail || `${response.status} ${response.statusText}`));
+  }
+  return data;
+}
+
+function humanizeErrorMessage(message) {
+  const value = String(message || "").trim();
+  const known = {
+    "department code already exists":
+      "Department code already exists. Demo data already contains Emergency (ER), so create a different department such as ICU.",
+    "worker document_id already exists":
+      "Worker document ID already exists. Use a new document number for each worker.",
+    "schedule period already exists for department and month":
+      "That schedule period already exists for this department. Pick another month or create a new department first.",
+    "worker does not belong to the schedule department":
+      "The selected worker belongs to a different department than the selected schedule period.",
+    "worker already has an overlapping assignment":
+      "That worker already has another assignment overlapping the same date and time.",
+    "schedule period must be draft to edit assignments":
+      "Assignments can only be created or edited while the schedule period is still in draft.",
+    "schedule period must be approved before export":
+      "Exports are only available after the schedule period has been approved.",
+    "department not found":
+      "Your current session points to a missing department. Log out, load demo data again, and log back in.",
+    "attendance enrollment already exists for worker":
+      "That worker is already enrolled for attendance.",
+    "worker must have an active attendance enrollment":
+      "This worker is not enrolled for attendance yet. Ask the coordinator to create the enrollment first.",
+  };
+  return known[value] || value;
 }
 
 function showFlash(message, kind = "success") {
@@ -168,6 +182,10 @@ function badgeClass(status) {
   return "badge";
 }
 
+function renderEmpty(target, message) {
+  target.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+}
+
 function optionMarkup(items, labelBuilder, placeholder = "Select one") {
   const options = [`<option value="">${placeholder}</option>`];
   for (const item of items) {
@@ -176,51 +194,91 @@ function optionMarkup(items, labelBuilder, placeholder = "Select one") {
   return options.join("");
 }
 
-function renderEmpty(target, message) {
-  target.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+function periodLabel(period) {
+  return `${period.year}-${String(period.month).padStart(2, "0")}`;
 }
 
-function getWorkerById(workerId) {
-  return state.workers.find((item) => item.id === workerId) || null;
+function setOverviewCounts() {
+  els.summaryDepartments.textContent = String(state.departments.length);
+  els.summaryWorkers.textContent = String(state.workers.length);
+  els.summaryPeriods.textContent = String(state.periods.length);
+  const period = state.periods.find((item) => item.id === state.selectedPeriodId);
+  els.summarySelectedPeriod.textContent = period ? periodLabel(period) : "None";
 }
 
 function syncSessionUI() {
-  const view = defaultViews[state.session.role];
-  els.role.value = state.session.role;
-  els.userId.value = state.session.userId;
-  els.heroTitle.textContent = view.title;
-  els.heroCopy.textContent = view.copy;
-  els.statusRole.textContent = state.session.role;
-  els.statusUser.textContent = state.session.userId;
-  els.sessionSummary.textContent = `Active session: ${state.session.userId} (${state.session.role})`;
-  els.navLinks.forEach((link) => link.classList.toggle("active", link.dataset.view === state.session.role));
-  Object.entries(els.views).forEach(([key, node]) => node.classList.toggle("active", key === state.session.role));
-}
+  const session = state.session;
+  const role = session?.role || "guest";
+  const meta = roleMeta[role];
 
-function setSession(role, userId) {
-  state.session.role = sanitizeRole(role);
-  state.session.userId = sanitizeUserId(userId) || defaultViews[state.session.role].userId;
-  persistSession();
-  syncSessionUI();
+  els.loginButton.hidden = Boolean(session);
+  els.logoutButton.hidden = !session;
+  els.email.disabled = Boolean(session);
+  els.password.disabled = Boolean(session);
+
+  els.heroKicker.textContent = meta.kicker;
+  els.heroTitle.textContent = meta.title;
+  els.heroCopy.textContent = meta.copy;
+  els.heroNoteTitle.textContent = meta.noteTitle;
+  els.heroNoteCopy.textContent = meta.noteCopy;
+
+  els.statusRole.textContent = role;
+  els.statusUser.textContent = session ? session.email : "not logged in";
+  els.sessionChip.textContent = session ? session.role : "Guest";
+  els.sessionSummary.textContent = session
+    ? `${session.full_name} · ${session.role}`
+    : "Load demo data first, then sign in with one of the role accounts above.";
+
+  els.roleCards.forEach((card) => {
+    card.classList.toggle("active", card.dataset.roleCard === role);
+  });
+
+  if (!session) {
+    Object.values(els.views).forEach((node) => node.classList.remove("active"));
+    els.navLinks.forEach((link) => {
+      link.hidden = true;
+      link.classList.remove("active");
+    });
+    els.workerSummary.textContent = "Log in as a worker to load your linked roster identity.";
+    els.approverSummary.textContent =
+      "Pending decisions appear in the review queue. Audit events explain what changed and who did it.";
+    return;
+  }
+
+  Object.entries(els.views).forEach(([key, node]) => node.classList.toggle("active", key === session.role));
+  els.navLinks.forEach((link) => {
+    const active = link.dataset.view === session.role;
+    link.hidden = !active;
+    link.classList.toggle("active", active);
+  });
+
+  if (session.role === "worker") {
+    els.workerSummary.textContent = session.worker_id
+      ? `${session.full_name} is linked to worker record ${session.worker_id}. This view only exposes their own assignments and requests.`
+      : `${session.full_name} is not linked to a worker record yet.`;
+  }
+
+  if (session.role === "approver") {
+    els.approverSummary.textContent =
+      "Use the review queue for decisions. Use the audit trail to inspect the evidence behind those changes.";
+  }
 }
 
 function updateSharedSelects() {
-  const departmentMarkup = optionMarkup(
+  const departmentOptions = optionMarkup(
     state.departments,
     (item) => `${item.name} (${item.code})`,
-    state.departments.length ? "Select department" : "Create a department first",
+    state.departments.length ? "Select department" : "No departments available",
   );
-  for (const select of els.departmentSelects) {
-    select.innerHTML = departmentMarkup;
-  }
+  els.departmentSelects.forEach((select) => {
+    select.innerHTML = departmentOptions;
+  });
 
-  const workersMarkup = optionMarkup(
+  els.assignmentWorkerSelect.innerHTML = optionMarkup(
     state.workers,
     (item) => `${item.full_name} · ${item.worker_type}`,
-    state.workers.length ? "Select worker" : "Create a worker first",
+    state.workers.length ? "Select worker" : "No workers available",
   );
-  els.assignmentWorkerSelect.innerHTML = workersMarkup;
-  els.workerSelfSelect.innerHTML = workersMarkup;
   els.replacementWorkerSelect.innerHTML =
     '<option value="">No replacement</option>' +
     state.workers
@@ -229,14 +287,22 @@ function updateSharedSelects() {
 
   els.assignmentPeriodSelect.innerHTML = optionMarkup(
     state.periods,
-    (item) => `${item.year}-${String(item.month).padStart(2, "0")} · ${item.status}`,
-    state.periods.length ? "Select period" : "Create a period first",
+    (item) => `${periodLabel(item)} · ${item.status}`,
+    state.periods.length ? "Select period" : "No periods available",
   );
+
+  els.attendanceEnrollmentWorkerSelect.innerHTML = optionMarkup(
+    state.workers,
+    (item) => `${item.full_name} · ${item.worker_type}`,
+    state.workers.length ? "Select worker" : "No workers available",
+  );
+
+  setOverviewCounts();
 }
 
 function renderPeriods() {
   if (!state.periods.length) {
-    renderEmpty(els.periodList, "No periods yet. Load demo data or create the monthly schedule first.");
+    renderEmpty(els.periodList, "No periods yet. Create the monthly schedule first.");
     return;
   }
 
@@ -246,16 +312,16 @@ function renderPeriods() {
         <article class="item">
           <div class="item-header">
             <div>
-              <h4 class="item-title">${period.year}-${String(period.month).padStart(2, "0")}</h4>
+              <h4 class="item-title">${periodLabel(period)}</h4>
               <div class="meta">
                 <span>${escapeHtml(period.department_id)}</span>
-                <span>Created by ${escapeHtml(period.created_by || "system")}</span>
+                <span>${escapeHtml(period.created_by || "system")}</span>
               </div>
             </div>
             <span class="${badgeClass(period.status)}">${escapeHtml(period.status)}</span>
           </div>
           <div class="actions">
-            <button class="secondary" data-action="inspect-period" data-period-id="${period.id}">Open calendar</button>
+            <button class="secondary" data-action="inspect-period" data-period-id="${period.id}" type="button">Open period</button>
           </div>
         </article>
       `,
@@ -265,18 +331,22 @@ function renderPeriods() {
 
 function renderCalendar(calendar) {
   state.selectedPeriodId = calendar.period.id;
-  els.calendarTitle.textContent = `Period ${calendar.period.year}-${String(calendar.period.month).padStart(2, "0")} · ${calendar.period.status}`;
+  const label = periodLabel(calendar.period);
+  els.calendarTitle.textContent = `${label} · ${calendar.period.status}`;
+  els.calendarSummary.textContent = `${calendar.assignments.length} assignments in ${label}. Send to review when the roster is complete, export only after approval.`;
   els.sendReview.disabled = calendar.period.status !== "draft";
   els.createExport.disabled = calendar.period.status !== "approved";
+  setOverviewCounts();
 
   if (!calendar.assignments.length) {
     renderEmpty(els.calendarList, "No assignments yet for this period.");
     return;
   }
 
+  const workerById = new Map(state.workers.map((item) => [item.id, item]));
   els.calendarList.innerHTML = calendar.assignments
     .map((assignment) => {
-      const worker = getWorkerById(assignment.worker_id);
+      const worker = workerById.get(assignment.worker_id);
       return `
         <article class="item">
           <div class="item-header">
@@ -297,35 +367,31 @@ function renderCalendar(calendar) {
 }
 
 function renderExports(items) {
-  if (!items.length) {
-    els.exportList.innerHTML = "";
-    return;
-  }
-
-  els.exportList.innerHTML = items
-    .map(
-      (item) => `
-        <article class="item">
-          <div class="item-header">
-            <div>
-              <h4 class="item-title">${escapeHtml(item.export_type)}</h4>
-              <div class="meta">
-                <span>${new Date(item.created_at).toLocaleString()}</span>
-                <span>By ${escapeHtml(item.created_by)}</span>
+  els.exportList.innerHTML = items.length
+    ? items
+        .map(
+          (item) => `
+            <article class="item">
+              <div class="item-header">
+                <div>
+                  <h4 class="item-title">${escapeHtml(item.export_type)}</h4>
+                  <div class="meta">
+                    <span>${new Date(item.created_at).toLocaleString()}</span>
+                    <span>${escapeHtml(item.created_by)}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <pre>${escapeHtml(item.content)}</pre>
-        </article>
-      `,
-    )
-    .join("");
+              <pre>${escapeHtml(item.content)}</pre>
+            </article>
+          `,
+        )
+        .join("")
+    : "";
 }
 
 function renderWorkerAssignments(items) {
-  state.workerAssignments = items;
   if (!items.length) {
-    renderEmpty(els.workerAssignmentList, "This worker has no assignments yet.");
+    renderEmpty(els.workerAssignmentList, "No assignments found for this worker.");
     els.changeAssignmentSelect.innerHTML = '<option value="">No assignments available</option>';
     return;
   }
@@ -346,7 +412,6 @@ function renderWorkerAssignments(items) {
               <div class="meta">
                 <span>${assignment.start_time} to ${assignment.end_time}</span>
                 <span>${escapeHtml(assignment.assignment_type)}</span>
-                <span>${escapeHtml(assignment.schedule_period_id)}</span>
               </div>
             </div>
           </div>
@@ -358,7 +423,6 @@ function renderWorkerAssignments(items) {
 }
 
 function renderWorkerRequests(items) {
-  state.workerRequests = items;
   if (!items.length) {
     renderEmpty(els.workerRequestList, "No requests submitted yet.");
     return;
@@ -385,14 +449,79 @@ function renderWorkerRequests(items) {
     .join("");
 }
 
+function renderAttendanceEnrollments(items) {
+  if (!items.length) {
+    renderEmpty(els.attendanceEnrollmentList, "No attendance enrollments yet.");
+    return;
+  }
+
+  const workerById = new Map(state.workers.map((item) => [item.id, item]));
+  els.attendanceEnrollmentList.innerHTML = items
+    .map((item) => {
+      const worker = workerById.get(item.worker_id);
+      return `
+        <article class="item">
+          <div class="item-header">
+            <div>
+              <h4 class="item-title">${escapeHtml(worker?.full_name || item.worker_id)}</h4>
+              <div class="meta">
+                <span>${escapeHtml(item.worker_id)}</span>
+                <span>${escapeHtml(item.created_by)}</span>
+              </div>
+            </div>
+            <span class="${badgeClass(item.status)}">${escapeHtml(item.status)}</span>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderAttendanceAttempts(items, { workerScoped = false } = {}) {
+  if (workerScoped) {
+    els.attendanceAssignmentSelect.innerHTML = optionMarkup(
+      items.map((item) => ({ id: item.assignment_id, label: item.assignment_id })),
+      (item) => item.label,
+      "Select assignment",
+    );
+  }
+
+  if (!items.length) {
+    renderEmpty(els.attendanceAttemptList, workerScoped ? "No attendance attempts yet." : "No attendance attempts pending.");
+    return;
+  }
+
+  els.attendanceAttemptList.innerHTML = items
+    .map(
+      (item) => `
+        <article class="item">
+          <div class="item-header">
+            <div>
+              <h4 class="item-title">${escapeHtml(item.attempt_type)}</h4>
+              <div class="meta">
+                <span>${escapeHtml(item.assignment_id)}</span>
+                <span>${new Date(item.attempted_at).toLocaleString()}</span>
+              </div>
+            </div>
+            <span class="${badgeClass(item.decision_status)}">${escapeHtml(item.decision_status)}</span>
+          </div>
+          ${item.evidence_ref ? `<p>${escapeHtml(item.evidence_ref)}</p>` : ""}
+          ${item.review_reason ? `<p class="muted">${escapeHtml(item.review_reason)}</p>` : ""}
+        </article>
+      `,
+    )
+    .join("");
+}
+
 function renderReviewQueue(data) {
   const items = [
     ...data.schedule_periods.map((item) => ({
       type: "schedule_period",
       id: item.id,
-      title: `${item.year}-${String(item.month).padStart(2, "0")} period`,
+      title: `${periodLabel(item)} period`,
       status: item.status,
       meta: [item.department_id, item.created_by || "system"],
+      reason: "",
     })),
     ...data.change_requests.map((item) => ({
       type: "change_request",
@@ -401,6 +530,14 @@ function renderReviewQueue(data) {
       status: item.status,
       meta: [item.assignment_id, item.requested_by],
       reason: item.reason,
+    })),
+    ...(data.attendance_attempts || []).map((item) => ({
+      type: "attendance_attempt",
+      id: item.id,
+      title: item.attempt_type,
+      status: item.decision_status,
+      meta: [item.assignment_id, item.worker_id],
+      reason: item.evidence_ref || "",
     })),
   ];
 
@@ -422,8 +559,8 @@ function renderReviewQueue(data) {
           </div>
           ${item.reason ? `<p>${escapeHtml(item.reason)}</p>` : ""}
           <div class="actions">
-            <button class="primary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="approved">Approve</button>
-            <button class="secondary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="rejected">Reject</button>
+            <button class="primary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="approved" type="button">Approve</button>
+            <button class="secondary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="rejected" type="button">Reject</button>
           </div>
         </article>
       `,
@@ -458,119 +595,170 @@ function renderAudit(items) {
     .join("");
 }
 
-async function refreshReferenceData() {
-  const [departments, workers, periods] = await Promise.all([
+async function hydrateSession() {
+  try {
+    state.session = await api("/auth/session");
+  } catch {
+    state.session = null;
+  }
+  syncSessionUI();
+}
+
+async function refreshCoordinatorData() {
+  const [departments, workers, periods, attendanceEnrollments] = await Promise.all([
     api("/scheduling/departments"),
     api("/scheduling/workers"),
     api("/scheduling/schedule-periods"),
+    api("/scheduling/attendance/enrollments"),
   ]);
   state.departments = departments;
   state.workers = workers;
   state.periods = periods.items;
+  state.attendanceEnrollments = attendanceEnrollments;
   updateSharedSelects();
   renderPeriods();
+  renderAttendanceEnrollments(attendanceEnrollments);
 }
 
 async function loadCalendar(periodId) {
-  const calendar = await api(`/scheduling/schedule-periods/${periodId}/calendar`);
+  const [calendar, exportsList] = await Promise.all([
+    api(`/scheduling/schedule-periods/${periodId}/calendar`),
+    api(`/scheduling/schedule-periods/${periodId}/exports`).catch(() => []),
+  ]);
   renderCalendar(calendar);
-  const exports = await api(`/scheduling/schedule-periods/${periodId}/exports`, {
-    headers: authHeaders("coordinator", state.session.userId),
-  }).catch(() => []);
-  renderExports(exports);
+  renderExports(exportsList);
 }
 
-async function loadWorkerData(workerId) {
-  const assignments = await api(`/scheduling/workers/${workerId}/assignments`);
+async function refreshWorkerData() {
+  if (!state.session?.worker_id) {
+    renderEmpty(els.workerAssignmentList, "No linked worker identity.");
+    renderEmpty(els.workerRequestList, "No linked worker identity.");
+    els.workerSummary.textContent = `${state.session?.full_name || "This account"} is not linked to a worker record.`;
+    return;
+  }
+
+  const [assignments, requests] = await Promise.all([
+    api(`/scheduling/workers/${state.session.worker_id}/assignments`),
+    api("/scheduling/change-requests"),
+  ]);
   renderWorkerAssignments(assignments.items);
-  const requests = await api(`/scheduling/change-requests?requested_by=${encodeURIComponent(workerId)}`);
+  els.attendanceAssignmentSelect.innerHTML = optionMarkup(
+    assignments.items,
+    (item) => `${item.shift_date} · ${item.start_time} · ${item.assignment_type}`,
+    "Select assignment",
+  );
   renderWorkerRequests(requests.items);
+  const attempts = await api("/scheduling/attendance/attempts");
+  renderAttendanceAttempts(attempts, { workerScoped: false });
+  els.workerSummary.textContent = `${state.session.full_name} has ${assignments.items.length} assignments and ${requests.items.length} submitted requests in this demo session.`;
 }
 
-async function loadApproverData() {
-  const queue = await api("/scheduling/review-queue", {
-    headers: authHeaders("approver", state.session.userId),
-  });
+async function refreshApproverData() {
+  const [queue, audit, attendanceAttempts] = await Promise.all([
+    api("/scheduling/review-queue"),
+    api("/scheduling/audit-events"),
+    api("/scheduling/attendance/review-queue"),
+  ]);
+  queue.attendance_attempts = attendanceAttempts;
   renderReviewQueue(queue);
-  const audit = await api("/scheduling/audit-events", {
-    headers: authHeaders("approver", state.session.userId),
-  });
   renderAudit(audit);
+  const pendingCount = queue.schedule_periods.length + queue.change_requests.length + attendanceAttempts.length;
+  els.approverSummary.textContent = `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for a decision. Audit trail shows the current evidence.`;
 }
 
-async function bootstrapViewData() {
-  await refreshReferenceData();
-  if (state.session.role === "worker" && state.session.userId.startsWith("wrk_")) {
-    els.workerSelfSelect.value = state.session.userId;
-    await loadWorkerData(state.session.userId);
-  }
-  if (state.session.role === "approver") {
-    await loadApproverData();
+async function refreshCurrentView() {
+  if (!state.session) return;
+  if (state.session.role === "coordinator") {
+    await refreshCoordinatorData();
+  } else if (state.session.role === "worker") {
+    await refreshWorkerData();
+  } else if (state.session.role === "approver") {
+    await refreshApproverData();
   }
 }
 
-els.applySession.addEventListener("click", async () => {
+async function bootstrapDemo() {
   clearFlash();
-  setSession(els.role.value, els.userId.value);
   try {
-    await bootstrapViewData();
-    showFlash("Session updated.");
+    const result = await api("/auth/bootstrap-demo", { method: "POST" });
+    showFlash(`Demo ready. Accounts: ${result.credentials.map((item) => item.email).join(", ")}`);
   } catch (error) {
     showFlash(error.message, "error");
   }
-});
+}
 
-els.loadDemo.addEventListener("click", async () => {
+async function login() {
   clearFlash();
   try {
-    const result = await api("/scheduling/demo/seed", {
+    const session = await api("/auth/login", {
       method: "POST",
-      headers: authHeaders("coordinator", state.session.userId),
+      body: JSON.stringify({
+        email: els.email.value.trim(),
+        password: els.password.value,
+      }),
     });
-    await bootstrapViewData();
-    showFlash(
-      result.seeded
-        ? `Demo data loaded: ${result.departments} department, ${result.workers} workers, ${result.assignments} assignments.`
-        : "Demo data already exists. Existing records kept.",
-    );
+    state.session = session;
+    syncSessionUI();
+    await refreshCurrentView();
+    showFlash(`Logged in as ${session.full_name}.`);
   } catch (error) {
     showFlash(error.message, "error");
   }
-});
+}
 
-els.navLinks.forEach((link) => {
-  link.addEventListener("click", async () => {
-    clearFlash();
-    setSession(link.dataset.view, defaultViews[link.dataset.view].userId);
-    try {
-      await bootstrapViewData();
-      showFlash(`Switched to ${link.dataset.view} workspace.`);
-    } catch (error) {
-      showFlash(error.message, "error");
-    }
-  });
-});
+async function logout() {
+  clearFlash();
+  try {
+    await api("/auth/logout", { method: "POST" });
+  } catch {}
+
+  state.session = null;
+  state.departments = [];
+  state.workers = [];
+  state.periods = [];
+  state.selectedPeriodId = "";
+
+  renderEmpty(els.periodList, "Log in to load coordinator data.");
+  renderEmpty(els.calendarList, "Log in to load calendar data.");
+  renderEmpty(els.attendanceEnrollmentList, "Log in to load attendance enrollments.");
+  renderEmpty(els.workerAssignmentList, "Log in to load worker data.");
+  renderEmpty(els.attendanceAttemptList, "Log in to load attendance attempts.");
+  renderEmpty(els.workerRequestList, "Log in to load worker requests.");
+  renderEmpty(els.reviewQueue, "Log in to load review queue.");
+  renderEmpty(els.auditList, "Log in to load audit events.");
+  els.calendarTitle.textContent = "Choose a period from the left to inspect the roster.";
+  els.calendarSummary.textContent = "No period selected.";
+  setOverviewCounts();
+  syncSessionUI();
+  showFlash("Logged out.");
+}
+
+els.loadDemo.addEventListener("click", bootstrapDemo);
+els.loginButton.addEventListener("click", login);
+els.logoutButton.addEventListener("click", logout);
 
 els.departmentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearFlash();
   const form = new FormData(event.currentTarget);
-  const name = normalizeText(form.get("name"), 80);
-  const code = normalizeText(form.get("code"), 20).toUpperCase();
-  if (!name || !code) {
-    showFlash("Department name and code are required.", "error");
-    return;
-  }
   try {
     await api("/scheduling/departments", {
       method: "POST",
-      body: JSON.stringify({ name, code }),
-      headers: authHeaders("coordinator", state.session.userId),
+      body: JSON.stringify({
+        name: String(form.get("name") || "").trim(),
+        code: String(form.get("code") || "").trim().toUpperCase(),
+      }),
     });
     event.currentTarget.reset();
-    await bootstrapViewData();
+    await refreshCoordinatorData();
     showFlash("Department created.");
   } catch (error) {
+    if (String(error.message).includes("Department code already exists")) {
+      await refreshCoordinatorData().catch(() => {});
+      const codes = state.departments.map((item) => `${item.name} (${item.code})`).join(", ");
+      showFlash(`Department code already exists. Current departments: ${codes || "none"}.`, "error");
+      return;
+    }
     showFlash(error.message, "error");
   }
 });
@@ -579,27 +767,18 @@ els.workerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearFlash();
   const form = new FormData(event.currentTarget);
-  const fullName = normalizeText(form.get("full_name"), 120);
-  const documentId = normalizeText(form.get("document_id"), 20).replace(/\s+/g, "");
-  const workerType = normalizeText(form.get("worker_type"), 60);
-  const departmentId = String(form.get("department_id") || "");
-  if (!fullName || !documentId || !workerType || !departmentId) {
-    showFlash("All worker fields are required.", "error");
-    return;
-  }
   try {
     await api("/scheduling/workers", {
       method: "POST",
       body: JSON.stringify({
-        full_name: fullName,
-        document_id: documentId,
-        worker_type: workerType,
-        department_id: departmentId,
+        full_name: String(form.get("full_name") || "").trim(),
+        document_id: String(form.get("document_id") || "").trim(),
+        worker_type: String(form.get("worker_type") || "").trim(),
+        department_id: form.get("department_id"),
       }),
-      headers: authHeaders("coordinator", state.session.userId),
     });
     event.currentTarget.reset();
-    await bootstrapViewData();
+    await refreshCoordinatorData();
     showFlash("Worker created.");
   } catch (error) {
     showFlash(error.message, "error");
@@ -610,25 +789,16 @@ els.periodForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearFlash();
   const form = new FormData(event.currentTarget);
-  const year = Number(form.get("year"));
-  const month = Number(form.get("month"));
-  const departmentId = String(form.get("department_id") || "");
-  if (!Number.isInteger(year) || year < 2024 || year > 2035 || !Number.isInteger(month) || month < 1 || month > 12 || !departmentId) {
-    showFlash("Period values are invalid.", "error");
-    return;
-  }
   try {
     await api("/scheduling/schedule-periods", {
       method: "POST",
       body: JSON.stringify({
-        year,
-        month,
-        department_id: departmentId,
-        created_by: state.session.userId,
+        year: Number(form.get("year")),
+        month: Number(form.get("month")),
+        department_id: form.get("department_id"),
       }),
-      headers: authHeaders("coordinator", state.session.userId),
     });
-    await bootstrapViewData();
+    await refreshCoordinatorData();
     showFlash("Schedule period created.");
   } catch (error) {
     showFlash(error.message, "error");
@@ -640,33 +810,39 @@ els.assignmentForm.addEventListener("submit", async (event) => {
   clearFlash();
   const form = new FormData(event.currentTarget);
   const periodId = String(form.get("period_id") || "");
-  const workerId = String(form.get("worker_id") || "");
-  const shiftDate = String(form.get("shift_date") || "");
-  const startTime = String(form.get("start_time") || "");
-  const endTime = String(form.get("end_time") || "");
-  const assignmentType = String(form.get("assignment_type") || "guard_shift");
-  const notes = normalizeText(form.get("notes"), 300) || null;
-  if (!periodId || !workerId || !shiftDate || !startTime || !endTime) {
-    showFlash("Assignment fields are required.", "error");
-    return;
-  }
   try {
     await api(`/scheduling/schedule-periods/${periodId}/assignments`, {
       method: "POST",
       body: JSON.stringify({
-        worker_id: workerId,
-        assignment_type: assignmentType,
-        shift_date: shiftDate,
-        start_time: startTime,
-        end_time: endTime,
-        notes,
+        worker_id: form.get("worker_id"),
+        assignment_type: form.get("assignment_type"),
+        shift_date: form.get("shift_date"),
+        start_time: form.get("start_time"),
+        end_time: form.get("end_time"),
+        notes: String(form.get("notes") || "").trim() || null,
       }),
-      headers: authHeaders("coordinator", state.session.userId),
     });
     event.currentTarget.reset();
-    await bootstrapViewData();
-    await loadCalendar(periodId);
+    await refreshCoordinatorData();
+    if (periodId) await loadCalendar(periodId);
     showFlash("Assignment created.");
+  } catch (error) {
+    showFlash(error.message, "error");
+  }
+});
+
+els.attendanceEnrollmentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearFlash();
+  try {
+    await api("/scheduling/attendance/enrollments", {
+      method: "POST",
+      body: JSON.stringify({
+        worker_id: els.attendanceEnrollmentWorkerSelect.value,
+      }),
+    });
+    await refreshCoordinatorData();
+    showFlash("Attendance enrollment created.");
   } catch (error) {
     showFlash(error.message, "error");
   }
@@ -675,8 +851,8 @@ els.assignmentForm.addEventListener("submit", async (event) => {
 els.refreshPeriods.addEventListener("click", async () => {
   clearFlash();
   try {
-    await refreshReferenceData();
-    showFlash("Periods refreshed.");
+    await refreshCoordinatorData();
+    showFlash("Coordinator data refreshed.");
   } catch (error) {
     showFlash(error.message, "error");
   }
@@ -688,7 +864,7 @@ els.periodList.addEventListener("click", async (event) => {
   clearFlash();
   try {
     await loadCalendar(button.dataset.periodId);
-    showFlash("Calendar loaded.");
+    showFlash("Period loaded.");
   } catch (error) {
     showFlash(error.message, "error");
   }
@@ -701,9 +877,8 @@ els.sendReview.addEventListener("click", async () => {
     await api(`/scheduling/schedule-periods/${state.selectedPeriodId}`, {
       method: "PATCH",
       body: JSON.stringify({ status: "in_review" }),
-      headers: authHeaders("coordinator", state.session.userId),
     });
-    await bootstrapViewData();
+    await refreshCoordinatorData();
     await loadCalendar(state.selectedPeriodId);
     showFlash("Period sent to review.");
   } catch (error) {
@@ -717,11 +892,7 @@ els.createExport.addEventListener("click", async () => {
   try {
     await api(`/scheduling/schedule-periods/${state.selectedPeriodId}/exports`, {
       method: "POST",
-      body: JSON.stringify({
-        export_type: "compliance_report",
-        created_by: state.session.userId,
-      }),
-      headers: authHeaders("coordinator", state.session.userId),
+      body: JSON.stringify({ export_type: "compliance_report" }),
     });
     await loadCalendar(state.selectedPeriodId);
     showFlash("Export created.");
@@ -730,19 +901,11 @@ els.createExport.addEventListener("click", async () => {
   }
 });
 
-els.workerContextForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
+els.refreshWorker.addEventListener("click", async () => {
   clearFlash();
-  const workerId = sanitizeUserId(els.workerSelfSelect.value);
-  if (!workerId) {
-    showFlash("Select a worker first.", "error");
-    return;
-  }
-  setSession("worker", workerId);
-  els.workerSelfSelect.value = workerId;
   try {
-    await loadWorkerData(workerId);
-    showFlash("Worker schedule loaded.");
+    await refreshWorkerData();
+    showFlash("Worker data refreshed.");
   } catch (error) {
     showFlash(error.message, "error");
   }
@@ -751,28 +914,39 @@ els.workerContextForm.addEventListener("submit", async (event) => {
 els.changeRequestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearFlash();
-  const assignmentId = String(els.changeAssignmentSelect.value || "");
-  const requestType = String(document.querySelector("#change-request-type").value || "swap");
-  const replacementWorkerId = sanitizeUserId(els.replacementWorkerSelect.value) || null;
-  const reason = normalizeText(els.changeReason.value, 400);
-  if (!assignmentId || !reason) {
-    showFlash("Assignment and reason are required.", "error");
-    return;
-  }
+  const assignmentId = els.changeAssignmentSelect.value;
   try {
     await api(`/scheduling/assignments/${assignmentId}/change-requests`, {
       method: "POST",
       body: JSON.stringify({
-        requested_by: state.session.userId,
-        request_type: requestType,
-        replacement_worker_id: replacementWorkerId,
-        reason,
+        request_type: els.changeRequestType.value,
+        replacement_worker_id: els.replacementWorkerSelect.value || null,
+        reason: els.changeReason.value.trim(),
       }),
-      headers: authHeaders("worker", state.session.userId),
     });
     els.changeReason.value = "";
-    await loadWorkerData(state.session.userId);
+    await refreshWorkerData();
     showFlash("Change request submitted.");
+  } catch (error) {
+    showFlash(error.message, "error");
+  }
+});
+
+els.attendanceAttemptForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearFlash();
+  try {
+    await api("/scheduling/attendance/attempts", {
+      method: "POST",
+      body: JSON.stringify({
+        assignment_id: els.attendanceAssignmentSelect.value,
+        attempt_type: els.attendanceAttemptType.value,
+        evidence_ref: els.attendanceEvidenceRef.value.trim() || null,
+      }),
+    });
+    els.attendanceEvidenceRef.value = "";
+    await refreshWorkerData();
+    showFlash("Attendance attempt submitted.");
   } catch (error) {
     showFlash(error.message, "error");
   }
@@ -780,9 +954,8 @@ els.changeRequestForm.addEventListener("submit", async (event) => {
 
 els.refreshQueue.addEventListener("click", async () => {
   clearFlash();
-  setSession("approver", state.session.userId || defaultViews.approver.userId);
   try {
-    await loadApproverData();
+    await refreshApproverData();
     showFlash("Review queue refreshed.");
   } catch (error) {
     showFlash(error.message, "error");
@@ -794,19 +967,26 @@ els.reviewQueue.addEventListener("click", async (event) => {
   if (!button) return;
   clearFlash();
   try {
-    await api("/scheduling/approval-decisions", {
-      method: "POST",
-      body: JSON.stringify({
-        target_type: button.dataset.targetType,
-        target_id: button.dataset.targetId,
-        decision: button.dataset.decision,
-        decided_by: state.session.userId,
-        comment: `${button.dataset.decision} from dashboard`,
-      }),
-      headers: authHeaders("approver", state.session.userId),
-    });
-    await loadApproverData();
-    await refreshReferenceData();
+    if (button.dataset.targetType === "attendance_attempt") {
+      await api(`/scheduling/attendance/attempts/${button.dataset.targetId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          decision_status: button.dataset.decision === "approved" ? "accepted" : "rejected",
+          review_reason: `${button.dataset.decision} from dashboard`,
+        }),
+      });
+    } else {
+      await api("/scheduling/approval-decisions", {
+        method: "POST",
+        body: JSON.stringify({
+          target_type: button.dataset.targetType,
+          target_id: button.dataset.targetId,
+          decision: button.dataset.decision,
+          comment: `${button.dataset.decision} from dashboard`,
+        }),
+      });
+    }
+    await refreshApproverData();
     showFlash(`Decision recorded: ${button.dataset.decision}.`);
   } catch (error) {
     showFlash(error.message, "error");
@@ -816,9 +996,7 @@ els.reviewQueue.addEventListener("click", async (event) => {
 els.refreshAudit.addEventListener("click", async () => {
   clearFlash();
   try {
-    const audit = await api("/scheduling/audit-events", {
-      headers: authHeaders("approver", state.session.userId),
-    });
+    const audit = await api("/scheduling/audit-events");
     renderAudit(audit);
     showFlash("Audit events refreshed.");
   } catch (error) {
@@ -827,18 +1005,19 @@ els.refreshAudit.addEventListener("click", async () => {
 });
 
 async function init() {
+  renderEmpty(els.periodList, "Log in to load coordinator data.");
+  renderEmpty(els.calendarList, "Log in to load calendar data.");
+  renderEmpty(els.attendanceEnrollmentList, "Log in to load attendance enrollments.");
+  renderEmpty(els.workerAssignmentList, "Log in to load worker data.");
+  renderEmpty(els.attendanceAttemptList, "Log in to load attendance attempts.");
+  renderEmpty(els.workerRequestList, "Log in to load worker requests.");
+  renderEmpty(els.reviewQueue, "Log in to load review queue.");
+  renderEmpty(els.auditList, "Log in to load audit events.");
+  setOverviewCounts();
   syncSessionUI();
-  try {
-    await bootstrapViewData();
-    renderEmpty(els.calendarList, "Pick a period to inspect assignments.");
-    renderEmpty(els.workerAssignmentList, "Pick a worker to load personal assignments.");
-    renderEmpty(els.workerRequestList, "Submitted requests will appear here.");
-    if (state.session.role !== "approver") {
-      renderEmpty(els.reviewQueue, "Switch to approver and refresh the queue.");
-      renderEmpty(els.auditList, "Switch to approver and refresh audit events.");
-    }
-  } catch (error) {
-    showFlash(error.message, "error");
+  await hydrateSession();
+  if (state.session) {
+    await refreshCurrentView();
   }
 }
 
