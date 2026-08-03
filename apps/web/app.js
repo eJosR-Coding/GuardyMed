@@ -5,6 +5,8 @@ const state = {
   periods: [],
   selectedPeriodId: "",
   attendanceEnrollments: [],
+  attendanceCaptureBase64: "",
+  attendanceCameraStream: null,
 };
 
 const els = {
@@ -44,6 +46,10 @@ const els = {
   attendanceEnrollmentForm: document.querySelector("#attendance-enrollment-form"),
   attendanceEnrollmentWorkerSelect: document.querySelector("#attendance-enrollment-worker-select"),
   attendanceEnrollmentList: document.querySelector("#attendance-enrollment-list"),
+  faceEnrollmentForm: document.querySelector("#face-enrollment-form"),
+  faceEnrollmentWorkerSelect: document.querySelector("#face-enrollment-worker-select"),
+  faceEnrollmentFile: document.querySelector("#face-enrollment-file"),
+  faceEnrollmentSummary: document.querySelector("#face-enrollment-summary"),
   departmentSelects: [
     document.querySelector("#worker-department-select"),
     document.querySelector("#period-department-select"),
@@ -64,8 +70,15 @@ const els = {
   attendanceAssignmentSelect: document.querySelector("#attendance-assignment-select"),
   attendanceAttemptForm: document.querySelector("#attendance-attempt-form"),
   attendanceAttemptType: document.querySelector("#attendance-attempt-type"),
-  attendanceEvidenceRef: document.querySelector("#attendance-evidence-ref"),
   attendanceAttemptList: document.querySelector("#attendance-attempt-list"),
+  attendanceCamera: document.querySelector("#attendance-camera"),
+  attendanceCapturePreview: document.querySelector("#attendance-capture-preview"),
+  attendanceCameraEmpty: document.querySelector("#attendance-camera-empty"),
+  attendanceCaptureFile: document.querySelector("#attendance-capture-file"),
+  attendanceCaptureStatus: document.querySelector("#attendance-capture-status"),
+  startCamera: document.querySelector("#start-camera"),
+  captureCamera: document.querySelector("#capture-camera"),
+  clearCapture: document.querySelector("#clear-capture"),
   changeRequestType: document.querySelector("#change-request-type"),
   replacementWorkerSelect: document.querySelector("#replacement-worker-select"),
   changeReason: document.querySelector("#change-reason"),
@@ -143,6 +156,10 @@ function humanizeErrorMessage(message) {
       "That worker is already enrolled for attendance.",
     "worker must have an active attendance enrollment":
       "This worker is not enrolled for attendance yet. Ask the manager to create the enrollment first.",
+    "face enrollment not found for worker":
+      "No face enrollment exists for this worker yet. Ask the manager to register the face first.",
+    "face could not be extracted from media":
+      "The uploaded or captured image did not contain a usable face. Try again with a clearer, front-facing image.",
   };
   return known[value] || value;
 }
@@ -177,6 +194,86 @@ function badgeClass(status) {
 
 function renderEmpty(target, message) {
   target.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+}
+
+function setCaptureStatus(message, kind = "muted") {
+  els.attendanceCaptureStatus.className = `summary-banner summary-banner-${kind}`;
+  els.attendanceCaptureStatus.textContent = message;
+}
+
+function setFaceEnrollmentSummary(message, kind = "muted") {
+  els.faceEnrollmentSummary.className = `summary-banner summary-banner-${kind} top-gap`;
+  els.faceEnrollmentSummary.textContent = message;
+}
+
+function clearAttendanceCapture() {
+  state.attendanceCaptureBase64 = "";
+  els.attendanceCapturePreview.hidden = true;
+  els.attendanceCapturePreview.removeAttribute("src");
+  els.attendanceCameraEmpty.hidden = false;
+  els.clearCapture.disabled = true;
+  setCaptureStatus("No capture ready.", "muted");
+}
+
+function setAttendanceCaptureFromDataUrl(dataUrl, sourceLabel) {
+  const [, payload = ""] = String(dataUrl).split(",", 2);
+  state.attendanceCaptureBase64 = payload;
+  els.attendanceCapturePreview.src = dataUrl;
+  els.attendanceCapturePreview.hidden = false;
+  els.attendanceCameraEmpty.hidden = true;
+  els.clearCapture.disabled = false;
+  setCaptureStatus(`Capture ready from ${sourceLabel}.`, "info");
+}
+
+async function fileToDataUrl(file) {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read the selected file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function stopAttendanceCamera() {
+  for (const track of state.attendanceCameraStream?.getTracks?.() || []) {
+    track.stop();
+  }
+  state.attendanceCameraStream = null;
+  els.attendanceCamera.hidden = true;
+  els.captureCamera.disabled = true;
+}
+
+async function startAttendanceCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("This browser does not support camera access.");
+  }
+  await stopAttendanceCamera();
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+    audio: false,
+  });
+  state.attendanceCameraStream = stream;
+  els.attendanceCamera.srcObject = stream;
+  els.attendanceCamera.hidden = false;
+  els.attendanceCameraEmpty.hidden = true;
+  els.captureCamera.disabled = false;
+  setCaptureStatus("Camera ready. Capture one clear front-facing frame.", "info");
+}
+
+function captureAttendanceFrame() {
+  if (!state.attendanceCameraStream) {
+    throw new Error("Start the camera before capturing a frame.");
+  }
+  const video = els.attendanceCamera;
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not prepare the camera capture.");
+  }
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  setAttendanceCaptureFromDataUrl(canvas.toDataURL("image/jpeg", 0.92), "camera");
 }
 
 function optionMarkup(items, labelBuilder, placeholder = "Select one") {
@@ -473,14 +570,6 @@ function renderAttendanceEnrollments(items) {
 }
 
 function renderAttendanceAttempts(items, { workerScoped = false } = {}) {
-  if (workerScoped) {
-    els.attendanceAssignmentSelect.innerHTML = optionMarkup(
-      items.map((item) => ({ id: item.assignment_id, label: item.assignment_id })),
-      (item) => item.label,
-      "Select assignment",
-    );
-  }
-
   if (!items.length) {
     renderEmpty(els.attendanceAttemptList, workerScoped ? "No attendance attempts yet." : "No attendance attempts pending.");
     return;
@@ -611,6 +700,11 @@ async function refreshManagerData() {
   state.periods = periods.items;
   state.attendanceEnrollments = attendanceEnrollments;
   updateSharedSelects();
+  els.faceEnrollmentWorkerSelect.innerHTML = optionMarkup(
+    state.workers,
+    (item) => `${item.full_name} · ${item.worker_type}`,
+    state.workers.length ? "Select worker" : "No workers available",
+  );
   renderPeriods();
   renderAttendanceEnrollments(attendanceEnrollments);
 }
@@ -628,6 +722,7 @@ async function refreshWorkerData() {
   if (!state.session?.worker_id) {
     renderEmpty(els.workerAssignmentList, "No linked worker identity.");
     renderEmpty(els.workerRequestList, "No linked worker identity.");
+    renderEmpty(els.attendanceAttemptList, "No linked worker identity.");
     els.workerSummary.textContent = `${state.session?.full_name || "This account"} is not linked to a worker record.`;
     return;
   }
@@ -644,7 +739,7 @@ async function refreshWorkerData() {
   );
   renderWorkerRequests(requests.items);
   const attempts = await api("/scheduling/attendance/attempts");
-  renderAttendanceAttempts(attempts, { workerScoped: false });
+  renderAttendanceAttempts(attempts, { workerScoped: true });
   els.workerSummary.textContent = `${state.session.full_name} has ${assignments.items.length} assignments and ${requests.items.length} submitted requests in this demo session.`;
 }
 
@@ -710,6 +805,8 @@ async function logout() {
   state.workers = [];
   state.periods = [];
   state.selectedPeriodId = "";
+  await stopAttendanceCamera();
+  clearAttendanceCapture();
 
   renderEmpty(els.periodList, "Log in to load manager data.");
   renderEmpty(els.calendarList, "Log in to load calendar data.");
@@ -721,6 +818,7 @@ async function logout() {
   renderEmpty(els.auditList, "Log in to load audit events.");
   els.calendarTitle.textContent = "Choose a period from the left to inspect the roster.";
   els.calendarSummary.textContent = "No period selected.";
+  setFaceEnrollmentSummary("No face enrollment submitted in this session.", "muted");
   setOverviewCounts();
   syncSessionUI();
   showFlash("Logged out.");
@@ -841,6 +939,34 @@ els.attendanceEnrollmentForm.addEventListener("submit", async (event) => {
   }
 });
 
+els.faceEnrollmentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearFlash();
+  try {
+    const file = els.faceEnrollmentFile.files?.[0];
+    if (!file) {
+      throw new Error("Select a face image first.");
+    }
+    const dataUrl = await fileToDataUrl(file);
+    const mediaBase64 = dataUrl.split(",", 2)[1] || "";
+    const result = await api("/scheduling/attendance/cv/enrollments", {
+      method: "POST",
+      body: JSON.stringify({
+        worker_id: els.faceEnrollmentWorkerSelect.value,
+        media_base64: mediaBase64,
+      }),
+    });
+    els.faceEnrollmentForm.reset();
+    setFaceEnrollmentSummary(
+      `Face enrollment created for ${result.enrollment.worker_id} with ${result.template.detector_name}.`,
+      "info",
+    );
+    showFlash("Face enrollment created.");
+  } catch (error) {
+    showFlash(error.message, "error");
+  }
+});
+
 els.refreshPeriods.addEventListener("click", async () => {
   clearFlash();
   try {
@@ -904,6 +1030,46 @@ els.refreshWorker.addEventListener("click", async () => {
   }
 });
 
+els.startCamera.addEventListener("click", async () => {
+  clearFlash();
+  try {
+    await startAttendanceCamera();
+  } catch (error) {
+    showFlash(error.message, "error");
+  }
+});
+
+els.captureCamera.addEventListener("click", () => {
+  clearFlash();
+  try {
+    captureAttendanceFrame();
+  } catch (error) {
+    showFlash(error.message, "error");
+  }
+});
+
+els.clearCapture.addEventListener("click", async () => {
+  clearFlash();
+  clearAttendanceCapture();
+  await stopAttendanceCamera();
+});
+
+els.attendanceCaptureFile.addEventListener("change", async (event) => {
+  clearFlash();
+  try {
+    const file = event.currentTarget.files?.[0];
+    if (!file) {
+      clearAttendanceCapture();
+      return;
+    }
+    const dataUrl = await fileToDataUrl(file);
+    await stopAttendanceCamera();
+    setAttendanceCaptureFromDataUrl(dataUrl, "upload");
+  } catch (error) {
+    showFlash(error.message, "error");
+  }
+});
+
 els.changeRequestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearFlash();
@@ -929,17 +1095,21 @@ els.attendanceAttemptForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearFlash();
   try {
-    await api("/scheduling/attendance/attempts", {
+    if (!state.attendanceCaptureBase64) {
+      throw new Error("Capture a face image before submitting attendance.");
+    }
+    const result = await api("/scheduling/attendance/cv/attempts", {
       method: "POST",
       body: JSON.stringify({
         assignment_id: els.attendanceAssignmentSelect.value,
         attempt_type: els.attendanceAttemptType.value,
-        evidence_ref: els.attendanceEvidenceRef.value.trim() || null,
+        media_base64: state.attendanceCaptureBase64,
       }),
     });
-    els.attendanceEvidenceRef.value = "";
+    clearAttendanceCapture();
+    await stopAttendanceCamera();
     await refreshWorkerData();
-    showFlash("Attendance attempt submitted.");
+    showFlash(`Face attendance submitted. Route: ${result.match_result.route}. Decision: ${result.attempt.decision_status}.`);
   } catch (error) {
     showFlash(error.message, "error");
   }
@@ -1006,6 +1176,8 @@ async function init() {
   renderEmpty(els.workerRequestList, "Log in to load worker requests.");
   renderEmpty(els.reviewQueue, "Log in to load review queue.");
   renderEmpty(els.auditList, "Log in to load audit events.");
+  clearAttendanceCapture();
+  setFaceEnrollmentSummary("No face enrollment submitted in this session.", "muted");
   setOverviewCounts();
   syncSessionUI();
   await hydrateSession();

@@ -478,6 +478,43 @@ button:focus {
   border-color: color-mix(in oklab, var(--warning) 25%, var(--line));
 }
 
+.top-gap {
+  margin-top: 16px;
+}
+
+.camera-card {
+  display: grid;
+  gap: 12px;
+}
+
+.camera-stage {
+  position: relative;
+  min-height: 240px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--surface) 88%, white);
+}
+
+.camera-stage video,
+.camera-stage img {
+  display: block;
+  width: 100%;
+  min-height: 240px;
+  max-height: 320px;
+  object-fit: cover;
+  background: oklch(0.22 0.02 286);
+}
+
+.camera-empty {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
 .view {
   display: none;
   flex-direction: column;

@@ -29,6 +29,7 @@ It currently includes:
 - a mounted browser MVP under `/app`
 - session-based workflows for manager and worker
 - scheduling, change request, approval, audit, export, and attendance scaffold endpoints
+- a basic browser face-enrollment and face-verification flow for the worker attendance demo
 - an initial Phase A system definition and architecture direction
 
 ## Solution Direction
@@ -345,7 +346,7 @@ Current status:
 The scheduling MVP exists, but these parts are still incomplete:
 
 - browser UI does not yet drive the face-recognition flow end to end
-- real camera capture is not wired yet
+- real camera capture is wired only for the local browser MVP, not production hardened
 - liveness detection is not implemented
 - multi-template enrollment is not implemented
 - manager review UI for match evidence is still basic

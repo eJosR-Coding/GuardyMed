@@ -325,6 +325,26 @@
                 </label>
                 <button class="primary" type="submit">Create attendance enrollment</button>
               </form>
+              <div class="section-heading with-margin">
+                <div>
+                  <p class="eyebrow">Face verification</p>
+                  <h3>Register worker face</h3>
+                </div>
+              </div>
+              <p class="muted form-hint">
+                Upload one clear face image to create the enrolled template used by the worker check-in flow.
+              </p>
+              <form id="face-enrollment-form" class="stack">
+                <label>
+                  Worker
+                  <select id="face-enrollment-worker-select" required></select>
+                </label>
+                <label>
+                  Face image
+                  <input id="face-enrollment-file" type="file" accept="image/*" required />
+                </label>
+                <button class="primary" type="submit">Create face enrollment</button>
+              </form>
             </section>
 
             <section class="panel">
@@ -335,6 +355,9 @@
                 </div>
               </div>
               <div id="attendance-enrollment-list" class="list separated"></div>
+              <div id="face-enrollment-summary" class="summary-banner summary-banner-muted top-gap">
+                No face enrollment submitted in this session.
+              </div>
             </section>
           </div>
 
@@ -404,12 +427,12 @@
             <section class="panel">
               <div class="section-heading">
                 <div>
-                  <p class="eyebrow">Attendance scaffold</p>
-                  <h3>Submit attendance</h3>
+                  <p class="eyebrow">Face attendance</p>
+                  <h3>Check in with face verification</h3>
                 </div>
               </div>
               <p class="muted form-hint">
-                Submit manual evidence against one of your assignments. Manager review stays manual in this MVP.
+                Start the camera or upload a face image, capture one frame, and submit it against the selected assignment.
               </p>
               <form id="attendance-attempt-form" class="stack">
                 <label>
@@ -423,11 +446,28 @@
                     <option value="check_out">Check out</option>
                   </select>
                 </label>
+                <div class="camera-card">
+                  <div class="camera-stage">
+                    <video id="attendance-camera" autoplay playsinline muted hidden></video>
+                    <img id="attendance-capture-preview" alt="Captured face preview" hidden />
+                    <div id="attendance-camera-empty" class="camera-empty">
+                      No capture ready yet. Start the camera or upload a fallback image.
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <button id="start-camera" class="secondary" type="button">Start camera</button>
+                    <button id="capture-camera" class="secondary" type="button" disabled>Capture frame</button>
+                    <button id="clear-capture" class="secondary" type="button" disabled>Clear capture</button>
+                  </div>
+                </div>
                 <label>
-                  Evidence reference
-                  <input id="attendance-evidence-ref" type="text" placeholder="manual://photo-or-frontdesk-note" />
+                  Upload fallback image
+                  <input id="attendance-capture-file" type="file" accept="image/*" />
                 </label>
-                <button class="primary" type="submit">Submit attendance</button>
+                <div id="attendance-capture-status" class="summary-banner summary-banner-muted">
+                  No capture ready.
+                </div>
+                <button class="primary" type="submit">Submit face attendance</button>
               </form>
               <div class="section-heading with-margin">
                 <div>
