@@ -146,6 +146,43 @@ class AttendanceAttemptRow(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class FaceEnrollmentRow(Base):
+    __tablename__ = "face_enrollments"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    worker_id: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32))
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class FaceTemplateRow(Base):
+    __tablename__ = "face_templates"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    enrollment_id: Mapped[str] = mapped_column(String(64))
+    embedding_json: Mapped[str] = mapped_column(Text)
+    quality_score: Mapped[float]
+    detector_name: Mapped[str] = mapped_column(String(128))
+    model_name: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AttendanceMatchResultRow(Base):
+    __tablename__ = "attendance_match_results"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(64))
+    enrollment_id: Mapped[str] = mapped_column(String(64))
+    similarity_score: Mapped[float]
+    route: Mapped[str] = mapped_column(String(32))
+    threshold_accept: Mapped[float]
+    threshold_review: Mapped[float]
+    detector_name: Mapped[str] = mapped_column(String(128))
+    model_name: Mapped[str] = mapped_column(String(128))
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 def make_engine(database_url: str):
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     return create_engine(database_url, future=True, connect_args=connect_args)

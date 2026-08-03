@@ -320,3 +320,77 @@ class AttendanceAttemptRead(BaseModel):
     decided_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FaceEnrollmentCreate(BaseModel):
+    worker_id: str
+    media_base64: str = Field(min_length=16)
+
+    @field_validator("worker_id", "media_base64")
+    @classmethod
+    def strip_face_enrollment_fields(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("value is required")
+        return cleaned
+
+
+class FaceEnrollmentRead(BaseModel):
+    id: str
+    worker_id: str
+    status: str
+    created_by: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FaceTemplateRead(BaseModel):
+    id: str
+    enrollment_id: str
+    worker_id: str
+    quality_score: float
+    detector_name: str
+    model_name: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FaceEnrollmentBundleRead(BaseModel):
+    enrollment: FaceEnrollmentRead
+    template: FaceTemplateRead
+
+
+class FaceVerificationCreate(BaseModel):
+    assignment_id: str
+    attempt_type: AttendanceAttemptType
+    media_base64: str = Field(min_length=16)
+
+    @field_validator("assignment_id", "media_base64")
+    @classmethod
+    def strip_face_verification_fields(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("value is required")
+        return cleaned
+
+
+class AttendanceMatchResultRead(BaseModel):
+    id: str
+    attempt_id: str
+    enrollment_id: str
+    similarity_score: float
+    route: str
+    threshold_accept: float
+    threshold_review: float
+    detector_name: str
+    model_name: str
+    processed_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FaceVerificationRead(BaseModel):
+    attempt: AttendanceAttemptRead
+    match_result: AttendanceMatchResultRead

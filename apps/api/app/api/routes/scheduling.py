@@ -7,6 +7,7 @@ from apps.api.app.api.routes.scheduling_models import (
     AttendanceAttemptCreate,
     AttendanceAttemptDecisionUpdate,
     AttendanceAttemptRead,
+    AttendanceMatchResultRead,
     AttendanceEnrollmentCreate,
     AttendanceEnrollmentRead,
     AuditEventRead,
@@ -20,6 +21,12 @@ from apps.api.app.api.routes.scheduling_models import (
     DepartmentRead,
     ExportCreate,
     ExportRead,
+    FaceEnrollmentBundleRead,
+    FaceEnrollmentCreate,
+    FaceEnrollmentRead,
+    FaceTemplateRead,
+    FaceVerificationCreate,
+    FaceVerificationRead,
     ScheduleCalendarRead,
     SchedulePeriodCreate,
     SchedulePeriodListRead,
@@ -33,6 +40,7 @@ from apps.api.app.api.routes.scheduling_models import (
     WorkerCreate,
     WorkerRead,
 )
+from apps.api.app.domain.attendance_cv.bootstrap import workflow as attendance_cv_workflow
 from apps.api.app.domain.scheduling import service
 
 router = APIRouter(prefix="/scheduling", tags=["scheduling"])
@@ -59,8 +67,8 @@ async def scheduling_capabilities() -> dict[str, object]:
 @router.get("/attendance/capabilities")
 async def attendance_capabilities() -> dict[str, object]:
     return {
-        "phase": "phase-1-scaffold",
-        "modules": ["enrollments", "attempts", "manual-review"],
+        "phase": "phase-1-cv-scaffold",
+        "modules": ["enrollments", "attempts", "manual-review", "face-enrollment", "face-verification"],
     }
 
 
@@ -91,6 +99,24 @@ async def list_attendance_enrollments(
     return [AttendanceEnrollmentRead.model_validate(item) for item in items]
 
 
+@router.post("/attendance/cv/enrollments", response_model=FaceEnrollmentBundleRead, status_code=status.HTTP_201_CREATED)
+async def create_face_enrollment(
+    payload: FaceEnrollmentCreate,
+    auth: AuthContext = Depends(require_roles(UserRole.MANAGER)),
+) -> FaceEnrollmentBundleRead:
+    worker = service._require_worker(payload.worker_id)
+    _require_department_access(auth, worker.department_id)
+    enrollment, template = attendance_cv_workflow.create_enrollment(
+        worker_id=payload.worker_id,
+        created_by=auth.user_id,
+        media_base64=payload.media_base64,
+    )
+    return FaceEnrollmentBundleRead(
+        enrollment=FaceEnrollmentRead.model_validate(enrollment),
+        template=FaceTemplateRead.model_validate(template),
+    )
+
+
 @router.post("/attendance/attempts", response_model=AttendanceAttemptRead, status_code=status.HTTP_201_CREATED)
 async def create_attendance_attempt(
     payload: AttendanceAttemptCreate,
@@ -104,6 +130,24 @@ async def create_attendance_attempt(
         evidence_ref=payload.evidence_ref,
     )
     return AttendanceAttemptRead.model_validate(attempt)
+
+
+@router.post("/attendance/cv/attempts", response_model=FaceVerificationRead, status_code=status.HTTP_201_CREATED)
+async def create_face_verification_attempt(
+    payload: FaceVerificationCreate,
+    auth: AuthContext = Depends(require_roles(UserRole.WORKER)),
+) -> FaceVerificationRead:
+    worker_id = _require_worker_identity(auth)
+    attempt, match_result = attendance_cv_workflow.verify_assignment_attempt(
+        worker_id=worker_id,
+        assignment_id=payload.assignment_id,
+        attempt_type=payload.attempt_type,
+        media_base64=payload.media_base64,
+    )
+    return FaceVerificationRead(
+        attempt=AttendanceAttemptRead.model_validate(attempt),
+        match_result=AttendanceMatchResultRead.model_validate(match_result),
+    )
 
 
 @router.get("/attendance/attempts", response_model=list[AttendanceAttemptRead])

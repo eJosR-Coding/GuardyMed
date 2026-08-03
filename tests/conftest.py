@@ -7,10 +7,13 @@ from apps.api.app.infra.db import (
     ApprovalDecisionRow,
     AttendanceAttemptRow,
     AttendanceEnrollmentRow,
+    AttendanceMatchResultRow,
     AuditEventRow,
     ChangeRequestRow,
     DepartmentRow,
     ExportJobRow,
+    FaceEnrollmentRow,
+    FaceTemplateRow,
     SchedulePeriodRow,
     ShiftAssignmentRow,
     WorkerRow,
@@ -24,6 +27,9 @@ def reset_database() -> None:
         session.execute(delete(SessionRow))
         session.execute(delete(UserRow))
         session.execute(delete(ApprovalDecisionRow))
+        session.execute(delete(AttendanceMatchResultRow))
+        session.execute(delete(FaceTemplateRow))
+        session.execute(delete(FaceEnrollmentRow))
         session.execute(delete(AttendanceAttemptRow))
         session.execute(delete(AttendanceEnrollmentRow))
         session.execute(delete(ChangeRequestRow))

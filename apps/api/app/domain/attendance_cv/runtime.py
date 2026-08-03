@@ -36,3 +36,68 @@ class DeterministicFaceEmbeddingRuntime:
             detector_name=self.detector_name,
             model_name=self.model_name,
         )
+
+
+class InsightFaceEmbeddingRuntime:
+    detector_name = "insightface-faceanalysis"
+
+    def __init__(self, *, model_name: str = "buffalo_l") -> None:
+        try:
+            import cv2
+            import numpy as np
+            from insightface.app import FaceAnalysis
+        except ImportError as exc:  # ponytail: fallback runtime handles local dev without heavy CV deps
+            raise RuntimeError("insightface runtime dependencies are not installed") from exc
+
+        self._cv2 = cv2
+        self._np = np
+        self.model_name = model_name
+        self._app = FaceAnalysis(name=model_name, providers=["CPUExecutionProvider"])
+        self._app.prepare(ctx_id=0, det_size=(640, 640))
+
+    def embed(self, media_bytes: bytes) -> FaceEmbeddingResult:
+        image = self._cv2.imdecode(self._np.frombuffer(media_bytes, dtype=self._np.uint8), self._cv2.IMREAD_COLOR)
+        if image is None:
+            return FaceEmbeddingResult(
+                face_detected=False,
+                quality_score=0.0,
+                embedding=None,
+                detector_name=self.detector_name,
+                model_name=self.model_name,
+            )
+
+        faces = self._app.get(image)
+        if not faces:
+            return FaceEmbeddingResult(
+                face_detected=False,
+                quality_score=0.0,
+                embedding=None,
+                detector_name=self.detector_name,
+                model_name=self.model_name,
+            )
+
+        face = max(
+            faces,
+            key=lambda item: (item.bbox[2] - item.bbox[0]) * (item.bbox[3] - item.bbox[1]),
+        )
+        embedding = getattr(face, "normed_embedding", None) or getattr(face, "embedding", None)
+        if embedding is None:
+            return FaceEmbeddingResult(
+                face_detected=False,
+                quality_score=0.0,
+                embedding=None,
+                detector_name=self.detector_name,
+                model_name=self.model_name,
+            )
+
+        vector = tuple(float(value) for value in embedding.tolist())
+        magnitude = math.sqrt(sum(value * value for value in vector)) or 1.0
+        normalized = tuple(value / magnitude for value in vector)
+        quality_score = float(getattr(face, "det_score", 0.0))
+        return FaceEmbeddingResult(
+            face_detected=True,
+            quality_score=quality_score,
+            embedding=FaceVector(values=normalized),
+            detector_name=self.detector_name,
+            model_name=self.model_name,
+        )

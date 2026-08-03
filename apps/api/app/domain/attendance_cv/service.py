@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
@@ -31,11 +32,14 @@ class AttendanceCVService:
         result = self._embed_or_raise(media_bytes)
         assert result.embedding is not None
         return FaceEnrollmentTemplate(
+            id="template_seed",
+            enrollment_id="enrollment_seed",
             worker_id=worker_id,
             embedding=result.embedding,
             quality_score=result.quality_score,
             detector_name=result.detector_name,
             model_name=result.model_name,
+            created_at=datetime.now(timezone.utc),
         )
 
     def verify_attempt(

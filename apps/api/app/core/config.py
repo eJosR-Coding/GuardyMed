@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     session_cookie_name: str = "guardymed_session"
     session_ttl_hours: int = 12
     password_salt: str = "guardymed-dev-salt"
+    attendance_cv_runtime: str = "stub"
+    attendance_cv_model_name: str = "buffalo_l"
+    attendance_cv_accept_threshold: float = 0.92
+    attendance_cv_review_threshold: float = 0.75
 
     model_config = SettingsConfigDict(env_prefix="GUARDYMED_", extra="ignore")
 
