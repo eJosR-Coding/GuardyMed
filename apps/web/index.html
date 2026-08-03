@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GuardyMed MVP</title>
+    <link rel="stylesheet" href="/app/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <p class="eyebrow">GuardyMed</p>
+          <h1>Shift operations MVP</h1>
+          <p class="muted">Monthly scheduling, worker requests, approval, audit and exports.</p>
+        </div>
+
+        <section class="panel compact">
+          <h2>Session</h2>
+          <label>
+            Role
+            <select id="session-role">
+              <option value="coordinator">Coordinator</option>
+              <option value="worker">Worker</option>
+              <option value="approver">Approver</option>
+            </select>
+          </label>
+          <label>
+            User id
+            <input id="session-user-id" type="text" value="coord_demo" />
+          </label>
+          <button id="apply-session" class="primary">Apply session</button>
+          <button id="load-demo" class="secondary" type="button">Load demo data</button>
+          <p id="session-summary" class="muted"></p>
+        </section>
+
+        <nav class="nav">
+          <button class="nav-link active" data-view="coordinator">Coordinator workspace</button>
+          <button class="nav-link" data-view="worker">Worker workspace</button>
+          <button class="nav-link" data-view="approver">Approver workspace</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="hero">
+          <div>
+            <p class="eyebrow">Current workspace</p>
+            <h2 id="hero-title">Coordinator workspace</h2>
+            <p id="hero-copy" class="muted">
+              Create the month, register staff, assign shifts, then send the period to review.
+            </p>
+          </div>
+          <div class="status-card">
+            <span class="status-dot"></span>
+            <div>
+              <strong id="status-role">coordinator</strong>
+              <p id="status-user" class="muted">coord_demo</p>
+            </div>
+          </div>
+        </header>
+
+        <p id="flash" class="flash" hidden></p>
+
+        <section id="view-coordinator" class="view active">
+          <div class="grid two">
+            <section class="panel">
+              <h3>1. Register department</h3>
+              <form id="department-form" class="stack">
+                <label>
+                  Department name
+                  <input name="name" type="text" placeholder="Emergency" required />
+                </label>
+                <label>
+                  Code
+                  <input name="code" type="text" placeholder="ER" required />
+                </label>
+                <button class="primary" type="submit">Create department</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <h3>2. Register worker</h3>
+              <form id="worker-form" class="stack">
+                <label>
+                  Full name
+                  <input name="full_name" type="text" placeholder="Ana Ruiz" required />
+                </label>
+                <label>
+                  Document id
+                  <input name="document_id" type="text" placeholder="12345678" required />
+                </label>
+                <label>
+                  Worker type
+                  <input name="worker_type" type="text" placeholder="Nurse" required />
+                </label>
+                <label>
+                  Department
+                  <select name="department_id" id="worker-department-select" required></select>
+                </label>
+                <button class="primary" type="submit">Create worker</button>
+              </form>
+            </section>
+          </div>
+
+          <div class="grid two">
+            <section class="panel">
+              <h3>3. Create schedule period</h3>
+              <form id="period-form" class="stack">
+                <div class="row">
+                  <label>
+                    Year
+                    <input name="year" type="number" min="2024" max="2035" value="2026" required />
+                  </label>
+                  <label>
+                    Month
+                    <input name="month" type="number" min="1" max="12" value="8" required />
+                  </label>
+                </div>
+                <label>
+                  Department
+                  <select name="department_id" id="period-department-select" required></select>
+                </label>
+                <button class="primary" type="submit">Create period</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <h3>4. Create assignment</h3>
+              <form id="assignment-form" class="stack">
+                <label>
+                  Period
+                  <select name="period_id" id="assignment-period-select" required></select>
+                </label>
+                <label>
+                  Worker
+                  <select name="worker_id" id="assignment-worker-select" required></select>
+                </label>
+                <label>
+                  Assignment type
+                  <select name="assignment_type">
+                    <option value="guard_shift">Guard shift</option>
+                    <option value="shift_lead">Shift lead</option>
+                    <option value="on_call">On call</option>
+                  </select>
+                </label>
+                <div class="row">
+                  <label>
+                    Shift date
+                    <input name="shift_date" type="date" required />
+                  </label>
+                  <label>
+                    Start
+                    <input name="start_time" type="time" required />
+                  </label>
+                  <label>
+                    End
+                    <input name="end_time" type="time" required />
+                  </label>
+                </div>
+                <label>
+                  Notes
+                  <textarea name="notes" rows="2" placeholder="Night coverage"></textarea>
+                </label>
+                <button class="primary" type="submit">Create assignment</button>
+              </form>
+            </section>
+          </div>
+
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Periods</h3>
+                  <p class="muted">Select a period to inspect the calendar and exports.</p>
+                </div>
+                <button id="refresh-periods" class="secondary">Refresh</button>
+              </div>
+              <div id="period-list" class="list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Calendar</h3>
+                  <p id="calendar-title" class="muted">Pick a period from the left.</p>
+                </div>
+                <div class="toolbar">
+                  <button id="send-review" class="secondary" disabled>Send to review</button>
+                  <button id="create-export" class="secondary" disabled>Create export</button>
+                </div>
+              </div>
+              <div id="calendar-list" class="list"></div>
+              <div id="export-list" class="list separated"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="view-worker" class="view">
+          <div class="grid two">
+            <section class="panel">
+              <h3>My assignments</h3>
+              <form id="worker-context-form" class="stack">
+                <label>
+                  Worker
+                  <select id="worker-self-select" required></select>
+                </label>
+                <button class="primary" type="submit">Load my schedule</button>
+              </form>
+              <div id="worker-assignment-list" class="list separated"></div>
+            </section>
+
+            <section class="panel">
+              <h3>Request change</h3>
+              <form id="change-request-form" class="stack">
+                <label>
+                  Assignment
+                  <select id="change-assignment-select" required></select>
+                </label>
+                <label>
+                  Request type
+                  <select id="change-request-type">
+                    <option value="swap">Swap</option>
+                    <option value="replacement">Replacement</option>
+                    <option value="incident">Incident</option>
+                    <option value="adjustment">Adjustment</option>
+                  </select>
+                </label>
+                <label>
+                  Replacement worker (optional)
+                  <select id="replacement-worker-select">
+                    <option value="">No replacement</option>
+                  </select>
+                </label>
+                <label>
+                  Reason
+                  <textarea id="change-reason" rows="3" placeholder="Need schedule adjustment" required></textarea>
+                </label>
+                <button class="primary" type="submit">Submit request</button>
+              </form>
+              <div id="worker-request-list" class="list separated"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="view-approver" class="view">
+          <div class="grid two">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Review queue</h3>
+                  <p class="muted">Approve or reject periods and worker requests.</p>
+                </div>
+                <button id="refresh-queue" class="secondary">Refresh</button>
+              </div>
+              <div id="review-queue" class="list separated"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Audit trail</h3>
+                  <p class="muted">Operational evidence from the current system state.</p>
+                </div>
+                <button id="refresh-audit" class="secondary">Refresh</button>
+              </div>
+              <div id="audit-list" class="list separated"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/app/app.js"></script>
+  </body>
+</html>

@@ -60,6 +60,12 @@ def test_auth_protected_routes_are_registered() -> None:
     paths = {route.path for route in app.routes}
 
     assert "/api/v1/scheduling/departments" in paths
+    assert "/api/v1/scheduling/demo/seed" in paths
+    assert "/api/v1/scheduling/workers" in paths
+    assert "/api/v1/scheduling/schedule-periods" in paths
+    assert "/api/v1/scheduling/change-requests" in paths
     assert "/api/v1/scheduling/review-queue" in paths
     assert "/api/v1/scheduling/approval-decisions" in paths
     assert "/api/v1/scheduling/audit-events" in paths
+    assert "/app" in paths
+    assert "/" in paths

@@ -54,6 +54,9 @@ class SchedulingService:
         )
         return created
 
+    def list_departments(self) -> list[Department]:
+        return self.repository.list_departments()
+
     def create_worker(
         self,
         *,
@@ -79,6 +82,11 @@ class SchedulingService:
             payload={"department_id": created.department_id, "worker_type": created.worker_type},
         )
         return created
+
+    def list_workers(self, *, department_id: str | None = None) -> list[Worker]:
+        if department_id is not None:
+            self._require_department(department_id)
+        return self.repository.list_workers(department_id=department_id)
 
     def create_period(
         self,
@@ -112,6 +120,11 @@ class SchedulingService:
         if period is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="schedule period not found")
         return period
+
+    def list_periods(self, *, department_id: str | None = None) -> list[SchedulePeriod]:
+        if department_id is not None:
+            self._require_department(department_id)
+        return self.repository.list_periods(department_id=department_id)
 
     def update_period_status(self, period_id: str, *, status_value: SchedulePeriodStatus) -> SchedulePeriod:
         period = self.get_period(period_id)
@@ -199,6 +212,10 @@ class SchedulingService:
         assignments.sort(key=lambda item: (item.shift_date, item.start_time, item.worker_id))
         return ScheduleCalendar(period=period, assignments=assignments)
 
+    def list_assignments_for_worker(self, worker_id: str) -> list[ShiftAssignment]:
+        self._require_worker(worker_id)
+        return self.repository.list_assignments_for_worker(worker_id)
+
     def create_change_request(
         self,
         *,
@@ -238,6 +255,11 @@ class SchedulingService:
         if change_request is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="change request not found")
         return change_request
+
+    def list_change_requests(self, *, requested_by: str | None = None) -> list[ChangeRequest]:
+        if requested_by is not None:
+            self._require_worker(requested_by)
+        return self.repository.list_change_requests(requested_by=requested_by)
 
     def update_change_request_status(
         self,
@@ -297,11 +319,9 @@ class SchedulingService:
         return created
 
     def list_review_queue(self) -> dict[str, list[object]]:
-        periods = [period for period in self.repository.periods.values() if period.status == SchedulePeriodStatus.IN_REVIEW]
+        periods = [period for period in self.repository.list_periods() if period.status == SchedulePeriodStatus.IN_REVIEW]
         requests = [
-            change_request
-            for change_request in self.repository.change_requests.values()
-            if change_request.status == ChangeRequestStatus.PENDING
+            change_request for change_request in self.repository.list_change_requests() if change_request.status == ChangeRequestStatus.PENDING
         ]
         periods.sort(key=lambda item: (item.year, item.month, item.id))
         requests.sort(key=lambda item: item.id)
@@ -358,6 +378,81 @@ class SchedulingService:
         exports = self.repository.list_exports_for_period(period_id)
         exports.sort(key=lambda item: item.created_at)
         return exports
+
+    def seed_demo_data(self) -> dict[str, int | bool]:
+        if self.repository.list_departments():
+            return {
+                "seeded": False,
+                "departments": len(self.repository.list_departments()),
+                "workers": len(self.repository.list_workers()),
+                "periods": len(self.repository.list_periods()),
+                "assignments": sum(len(self.repository.list_assignments_for_period(item.id)) for item in self.repository.list_periods()),
+                "change_requests": len(self.repository.list_change_requests()),
+            }
+
+        department = self.create_department(name="Emergency", code="ER")
+        worker_1 = self.create_worker(
+            full_name="Ana Ruiz",
+            document_id="10010010",
+            worker_type="Nurse",
+            department_id=department.id,
+        )
+        worker_2 = self.create_worker(
+            full_name="Luis Torres",
+            document_id="20020020",
+            worker_type="Doctor",
+            department_id=department.id,
+        )
+        worker_3 = self.create_worker(
+            full_name="Marta Vega",
+            document_id="30030030",
+            worker_type="Nurse",
+            department_id=department.id,
+        )
+        period = self.create_period(year=2026, month=8, department_id=department.id, created_by="coord_demo")
+        assignment_1 = self.create_assignment(
+            period_id=period.id,
+            worker_id=worker_1.id,
+            assignment_type=AssignmentType.GUARD_SHIFT,
+            shift_date=date(2026, 8, 4),
+            start_time=time(8, 0),
+            end_time=time(20, 0),
+            notes="Emergency daytime coverage",
+        )
+        self.create_assignment(
+            period_id=period.id,
+            worker_id=worker_2.id,
+            assignment_type=AssignmentType.SHIFT_LEAD,
+            shift_date=date(2026, 8, 5),
+            start_time=time(20, 0),
+            end_time=time(23, 59),
+            notes="Night shift lead",
+        )
+        self.create_assignment(
+            period_id=period.id,
+            worker_id=worker_3.id,
+            assignment_type=AssignmentType.ON_CALL,
+            shift_date=date(2026, 8, 6),
+            start_time=time(8, 0),
+            end_time=time(18, 0),
+            notes="Backup coverage",
+        )
+        self.create_change_request(
+            assignment_id=assignment_1.id,
+            requested_by=worker_1.id,
+            request_type=ChangeRequestType.ADJUSTMENT,
+            reason="Medical appointment overlap",
+            replacement_worker_id=worker_3.id,
+        )
+
+        return {
+            "seeded": True,
+            "departments": 1,
+            "workers": 3,
+            "periods": 1,
+            "assignments": 3,
+            "change_requests": 1,
+        }
 
     def _require_department(self, department_id: str) -> Department:
         department = self.repository.get_department(department_id)

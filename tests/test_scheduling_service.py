@@ -419,6 +419,34 @@ def test_create_and_fetch_export_for_approved_period() -> None:
     assert len(period_exports) == 1
 
 
+def test_seed_demo_data_is_idempotent() -> None:
+    service = build_service()
+
+    first = service.seed_demo_data()
+    second = service.seed_demo_data()
+
+    assert first["seeded"] is True
+    assert first["departments"] == 1
+    assert first["workers"] == 3
+    assert first["periods"] == 1
+    assert first["assignments"] == 3
+    assert first["change_requests"] == 1
+    assert second["seeded"] is False
+    assert second["departments"] == 1
+
+
+def test_review_queue_uses_repository_lists() -> None:
+    service = build_service()
+    service.seed_demo_data()
+
+    period = service.list_periods()[0]
+    service.update_period_status(period.id, status_value=SchedulePeriodStatus.IN_REVIEW)
+    queue = service.list_review_queue()
+
+    assert len(queue["schedule_periods"]) == 1
+    assert len(queue["change_requests"]) == 1
+
+
 def test_export_requires_approved_period() -> None:
     service = build_service()
 
