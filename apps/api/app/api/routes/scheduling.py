@@ -6,18 +6,22 @@ from apps.api.app.api.routes.scheduling_models import (
     ApprovalDecisionRead,
     AuditEventRead,
     ChangeRequestCreate,
+    ChangeRequestListRead,
     ChangeRequestRead,
     ChangeRequestUpdate,
+    DemoSeedRead,
     DepartmentCreate,
     DepartmentRead,
     ExportCreate,
     ExportRead,
     ScheduleCalendarRead,
     SchedulePeriodCreate,
+    SchedulePeriodListRead,
     SchedulePeriodRead,
     SchedulePeriodUpdate,
     ReviewQueueRead,
     ShiftAssignmentCreate,
+    ShiftAssignmentListRead,
     ShiftAssignmentRead,
     ShiftAssignmentUpdate,
     WorkerCreate,
@@ -46,12 +50,26 @@ async def scheduling_capabilities() -> dict[str, object]:
     }
 
 
+@router.post("/demo/seed", response_model=DemoSeedRead)
+async def seed_demo_data(
+    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
+) -> DemoSeedRead:
+    return DemoSeedRead.model_validate(service.seed_demo_data())
+
+
 @router.post("/departments", response_model=DepartmentRead, status_code=status.HTTP_201_CREATED)
 async def create_department(
     payload: DepartmentCreate,
     _: AuthContext = Depends(require_roles(UserRole.COORDINATOR)),
 ) -> DepartmentRead:
     return DepartmentRead.model_validate(service.create_department(name=payload.name, code=payload.code))
+
+
+@router.get("/departments", response_model=list[DepartmentRead])
+async def list_departments(
+    _: AuthContext = Depends(get_auth_context),
+) -> list[DepartmentRead]:
+    return [DepartmentRead.model_validate(item) for item in service.list_departments()]
 
 
 @router.post("/workers", response_model=WorkerRead, status_code=status.HTTP_201_CREATED)
@@ -68,6 +86,14 @@ async def create_worker(
     return WorkerRead.model_validate(worker)
 
 
+@router.get("/workers", response_model=list[WorkerRead])
+async def list_workers(
+    department_id: str | None = None,
+    _: AuthContext = Depends(get_auth_context),
+) -> list[WorkerRead]:
+    return [WorkerRead.model_validate(item) for item in service.list_workers(department_id=department_id)]
+
+
 @router.post("/schedule-periods", response_model=SchedulePeriodRead, status_code=status.HTTP_201_CREATED)
 async def create_schedule_period(
     payload: SchedulePeriodCreate,
@@ -80,6 +106,16 @@ async def create_schedule_period(
         created_by=payload.created_by or auth.user_id,
     )
     return SchedulePeriodRead.model_validate(period)
+
+
+@router.get("/schedule-periods", response_model=SchedulePeriodListRead)
+async def list_schedule_periods(
+    department_id: str | None = None,
+    _: AuthContext = Depends(get_auth_context),
+) -> SchedulePeriodListRead:
+    return SchedulePeriodListRead(
+        items=[SchedulePeriodRead.model_validate(item) for item in service.list_periods(department_id=department_id)]
+    )
 
 
 @router.get("/schedule-periods/{period_id}", response_model=SchedulePeriodRead)
@@ -145,6 +181,15 @@ async def get_schedule_calendar(
     return ScheduleCalendarRead.model_validate(calendar)
 
 
+@router.get("/workers/{worker_id}/assignments", response_model=ShiftAssignmentListRead)
+async def list_worker_assignments(
+    worker_id: str,
+    _: AuthContext = Depends(get_auth_context),
+) -> ShiftAssignmentListRead:
+    assignments = service.list_assignments_for_worker(worker_id)
+    return ShiftAssignmentListRead(items=[ShiftAssignmentRead.model_validate(item) for item in assignments])
+
+
 @router.post(
     "/assignments/{assignment_id}/change-requests",
     response_model=ChangeRequestRead,
@@ -171,6 +216,15 @@ async def get_change_request(
     _: AuthContext = Depends(get_auth_context),
 ) -> ChangeRequestRead:
     return ChangeRequestRead.model_validate(service.get_change_request(request_id))
+
+
+@router.get("/change-requests", response_model=ChangeRequestListRead)
+async def list_change_requests(
+    requested_by: str | None = None,
+    _: AuthContext = Depends(get_auth_context),
+) -> ChangeRequestListRead:
+    requests = service.list_change_requests(requested_by=requested_by)
+    return ChangeRequestListRead(items=[ChangeRequestRead.model_validate(item) for item in requests])
 
 
 @router.patch("/change-requests/{request_id}", response_model=ChangeRequestRead)

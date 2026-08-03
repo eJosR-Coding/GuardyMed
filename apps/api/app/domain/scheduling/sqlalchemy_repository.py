@@ -49,6 +49,11 @@ class SQLAlchemySchedulingRepository:
             row = session.get(DepartmentRow, department_id)
             return None if row is None else Department(id=row.id, name=row.name, code=row.code)
 
+    def list_departments(self) -> list[Department]:
+        with session_scope(self.session_factory) as session:
+            rows = session.scalars(select(DepartmentRow).order_by(DepartmentRow.name)).all()
+            return [Department(id=row.id, name=row.name, code=row.code) for row in rows]
+
     def create_worker(self, worker: Worker) -> Worker:
         row = WorkerRow(
             id=worker.id,
@@ -65,6 +70,14 @@ class SQLAlchemySchedulingRepository:
         with session_scope(self.session_factory) as session:
             row = session.get(WorkerRow, worker_id)
             return None if row is None else self._worker_from_row(row)
+
+    def list_workers(self, department_id: str | None = None) -> list[Worker]:
+        statement = select(WorkerRow).order_by(WorkerRow.full_name)
+        if department_id is not None:
+            statement = statement.where(WorkerRow.department_id == department_id)
+        with session_scope(self.session_factory) as session:
+            rows = session.scalars(statement).all()
+            return [self._worker_from_row(row) for row in rows]
 
     def create_period(self, period: SchedulePeriod) -> SchedulePeriod:
         row = SchedulePeriodRow(
@@ -83,6 +96,14 @@ class SQLAlchemySchedulingRepository:
         with session_scope(self.session_factory) as session:
             row = session.get(SchedulePeriodRow, period_id)
             return None if row is None else self._period_from_row(row)
+
+    def list_periods(self, department_id: str | None = None) -> list[SchedulePeriod]:
+        statement = select(SchedulePeriodRow).order_by(SchedulePeriodRow.year.desc(), SchedulePeriodRow.month.desc())
+        if department_id is not None:
+            statement = statement.where(SchedulePeriodRow.department_id == department_id)
+        with session_scope(self.session_factory) as session:
+            rows = session.scalars(statement).all()
+            return [self._period_from_row(row) for row in rows]
 
     def update_period(self, period: SchedulePeriod) -> SchedulePeriod:
         with session_scope(self.session_factory) as session:
@@ -131,6 +152,15 @@ class SQLAlchemySchedulingRepository:
             rows = session.scalars(select(ShiftAssignmentRow).where(ShiftAssignmentRow.schedule_period_id == period_id)).all()
             return [self._assignment_from_row(row) for row in rows]
 
+    def list_assignments_for_worker(self, worker_id: str) -> list[ShiftAssignment]:
+        with session_scope(self.session_factory) as session:
+            rows = session.scalars(
+                select(ShiftAssignmentRow)
+                .where(ShiftAssignmentRow.worker_id == worker_id)
+                .order_by(ShiftAssignmentRow.shift_date, ShiftAssignmentRow.start_time)
+            ).all()
+            return [self._assignment_from_row(row) for row in rows]
+
     def create_change_request(self, change_request: ChangeRequest) -> ChangeRequest:
         row = ChangeRequestRow(
             id=change_request.id,
@@ -149,6 +179,14 @@ class SQLAlchemySchedulingRepository:
         with session_scope(self.session_factory) as session:
             row = session.get(ChangeRequestRow, request_id)
             return None if row is None else self._change_request_from_row(row)
+
+    def list_change_requests(self, requested_by: str | None = None) -> list[ChangeRequest]:
+        statement = select(ChangeRequestRow).order_by(ChangeRequestRow.id.desc())
+        if requested_by is not None:
+            statement = statement.where(ChangeRequestRow.requested_by == requested_by)
+        with session_scope(self.session_factory) as session:
+            rows = session.scalars(statement).all()
+            return [self._change_request_from_row(row) for row in rows]
 
     def update_change_request(self, change_request: ChangeRequest) -> ChangeRequest:
         with session_scope(self.session_factory) as session:
