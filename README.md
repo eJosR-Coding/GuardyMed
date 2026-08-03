@@ -31,11 +31,35 @@ It currently includes:
 
 ## Solution Direction
 
+GuardyMed currently solves the operational core first:
+
+- build a monthly schedule period
+- assign staff to guard shifts
+- let workers submit change requests
+- let approvers review queue items
+- preserve audit events
+- generate monthly exports
+
 ## Architecture
+
+Current implementation is a modular monolith:
+
+- one FastAPI app
+- one mounted browser UI at `/app`
+- one scheduling domain module
+- one persistence path through SQLAlchemy
+
+This keeps Phase A simple while preserving clear boundaries for later AI and CV modules.
 
 ## C4 Diagrams
 
 ## Deployment
+
+Local development runs as a single FastAPI process.
+
+- API docs: `/docs`
+- mounted app: `/app`
+- health check: `/health`
 
 ## Tech Stack
 
@@ -47,7 +71,64 @@ It currently includes:
 
 ## Domain Model
 
+Current core entities:
+
+- Department
+- Worker
+- SchedulePeriod
+- ShiftAssignment
+- ChangeRequest
+- ApprovalDecision
+- AuditEvent
+- ExportJob
+
 ## API Design
+
+Base path: `/api/v1/scheduling`
+
+Auth model for the current MVP:
+
+- `x-user-id`
+- `x-user-role`
+
+Supported roles:
+
+- `coordinator`
+- `worker`
+- `approver`
+
+Implemented endpoints:
+
+- `GET /capabilities`
+- `POST /demo/seed`
+- `GET /departments`
+- `POST /departments`
+- `GET /workers`
+- `POST /workers`
+- `GET /schedule-periods`
+- `POST /schedule-periods`
+- `GET /schedule-periods/{period_id}`
+- `PATCH /schedule-periods/{period_id}`
+- `GET /schedule-periods/{period_id}/calendar`
+- `POST /schedule-periods/{period_id}/assignments`
+- `PATCH /assignments/{assignment_id}`
+- `GET /workers/{worker_id}/assignments`
+- `GET /change-requests`
+- `GET /change-requests/{request_id}`
+- `POST /assignments/{assignment_id}/change-requests`
+- `PATCH /change-requests/{request_id}`
+- `GET /review-queue`
+- `POST /approval-decisions`
+- `GET /audit-events`
+- `POST /schedule-periods/{period_id}/exports`
+- `GET /schedule-periods/{period_id}/exports`
+- `GET /exports/{export_id}`
+
+Quick local run:
+
+- `uv run uvicorn apps.api.app.main:app --reload`
+- open `http://127.0.0.1:8000/app`
+- load demo data from the session panel or call `POST /api/v1/scheduling/demo/seed`
 
 ## Repository Structure
 
@@ -57,6 +138,12 @@ It currently includes:
 - `docs`: product, architecture, and research notes
 
 ## Development Workflow
+
+- `main` for stable releases
+- `dev` as the integration branch
+- `feature/*` branches for isolated work
+- conventional commits
+- semver after meaningful integration milestones
 
 ## Status
 
@@ -69,3 +156,9 @@ Current status:
 - test suite is green with `uv run pytest`
 
 ## Roadmap
+
+- merge current Phase A browser MVP into `dev`
+- replace header-based demo auth with a real session/auth flow
+- add ownership checks for worker-scoped data
+- add stronger export and audit filters
+- add AI/CV modules only after the scheduling core is stable
