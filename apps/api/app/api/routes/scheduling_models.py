@@ -8,6 +8,9 @@ from apps.api.app.domain.scheduling.entities import AssignmentType, SchedulePeri
 from apps.api.app.domain.scheduling.entities import (
     ApprovalDecisionType,
     ApprovalTargetType,
+    AttendanceAttemptType,
+    AttendanceDecisionStatus,
+    AttendanceEnrollmentStatus,
     ChangeRequestStatus,
     ChangeRequestType,
     ExportType,
@@ -251,6 +254,8 @@ class ScheduleCalendarRead(BaseModel):
     period: SchedulePeriodRead
     assignments: list[ShiftAssignmentRead]
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class DemoSeedRead(BaseModel):
     seeded: bool
@@ -259,3 +264,59 @@ class DemoSeedRead(BaseModel):
     periods: int
     assignments: int
     change_requests: int
+
+
+class AttendanceEnrollmentCreate(BaseModel):
+    worker_id: str
+
+
+class AttendanceEnrollmentRead(BaseModel):
+    id: str
+    worker_id: str
+    status: AttendanceEnrollmentStatus
+    created_by: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttendanceAttemptCreate(BaseModel):
+    assignment_id: str
+    attempt_type: AttendanceAttemptType
+    evidence_ref: str | None = Field(default=None, max_length=300)
+
+    @field_validator("evidence_ref")
+    @classmethod
+    def strip_evidence_ref(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class AttendanceAttemptDecisionUpdate(BaseModel):
+    decision_status: AttendanceDecisionStatus
+    review_reason: str | None = Field(default=None, max_length=300)
+
+    @field_validator("review_reason")
+    @classmethod
+    def strip_review_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class AttendanceAttemptRead(BaseModel):
+    id: str
+    worker_id: str
+    assignment_id: str
+    attempt_type: AttendanceAttemptType
+    evidence_ref: str | None
+    attempted_at: datetime
+    decision_status: AttendanceDecisionStatus
+    review_reason: str | None
+    decided_by: str | None
+    decided_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -29,6 +29,28 @@ class WorkerRow(Base):
     department_id: Mapped[str] = mapped_column(String(64))
 
 
+class UserRow(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    full_name: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(32))
+    worker_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    department_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_active: Mapped[str] = mapped_column(String(8), default="true")
+
+
+class SessionRow(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class SchedulePeriodRow(Base):
     __tablename__ = "schedule_periods"
 
@@ -97,6 +119,31 @@ class ExportJobRow(Base):
     created_by: Mapped[str] = mapped_column(String(64))
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AttendanceEnrollmentRow(Base):
+    __tablename__ = "attendance_enrollments"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    worker_id: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32))
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AttendanceAttemptRow(Base):
+    __tablename__ = "attendance_attempts"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    worker_id: Mapped[str] = mapped_column(String(64))
+    assignment_id: Mapped[str] = mapped_column(String(64))
+    attempt_type: Mapped[str] = mapped_column(String(32))
+    evidence_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    decision_status: Mapped[str] = mapped_column(String(32))
+    review_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 def make_engine(database_url: str):

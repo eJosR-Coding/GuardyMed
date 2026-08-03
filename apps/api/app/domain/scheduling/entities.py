@@ -48,6 +48,22 @@ class ExportType(StrEnum):
     COMPLIANCE_REPORT = "compliance_report"
 
 
+class AttendanceEnrollmentStatus(StrEnum):
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+
+class AttendanceAttemptType(StrEnum):
+    CHECK_IN = "check_in"
+    CHECK_OUT = "check_out"
+
+
+class AttendanceDecisionStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
 @dataclass(slots=True)
 class Department:
     id: str
@@ -132,3 +148,26 @@ class ExportJob:
 class ScheduleCalendar:
     period: SchedulePeriod
     assignments: list[ShiftAssignment] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class AttendanceEnrollment:
+    id: str
+    worker_id: str
+    status: AttendanceEnrollmentStatus
+    created_by: str
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class AttendanceAttempt:
+    id: str
+    worker_id: str
+    assignment_id: str
+    attempt_type: AttendanceAttemptType
+    evidence_ref: str | None
+    attempted_at: datetime
+    decision_status: AttendanceDecisionStatus = AttendanceDecisionStatus.PENDING
+    review_reason: str | None = None
+    decided_by: str | None = None
+    decided_at: datetime | None = None
