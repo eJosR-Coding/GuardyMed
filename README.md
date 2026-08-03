@@ -183,6 +183,7 @@ Local development runs as a single FastAPI process.
 - SQLAlchemy
 - SQLite by default for local development
 - vanilla HTML, CSS, and JavaScript for the mounted MVP UI
+- Alpine.js for lightweight reactive UI state on top of the mounted MVP
 - pytest
 
 ## Domain Model
@@ -234,6 +235,7 @@ Implemented endpoints:
 - `GET /attendance/attempts`
 - `POST /attendance/attempts`
 - `POST /attendance/cv/attempts`
+- `GET /attendance/cv/attempts/{attempt_id}/match-result`
 - `GET /attendance/review-queue`
 - `PATCH /attendance/attempts/{attempt_id}`
 - `GET /schedule-periods`
@@ -350,6 +352,7 @@ The scheduling MVP exists, but these parts are still incomplete:
 - liveness detection is not implemented
 - multi-template enrollment is not implemented
 - manager review UI for match evidence is still basic
+- Alpine is integrated incrementally for visible UI state, not yet for full list rendering
 - attendance CV persistence is implemented at backend level but still not surfaced in the browser flow
 - deployment, storage, and async processing for media are still design-level, not production-level
 

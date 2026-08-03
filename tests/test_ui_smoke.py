@@ -27,9 +27,12 @@ async def test_web_static_assets_exist_and_contain_expected_ui_markers(client: A
     assert ":root {" in styles
     assert ".workflow-strip" in styles
     assert ".overview-panel" in styles
+    assert ".camera-stage" in styles
 
     assert "roleMeta" in script
     assert "humanizeErrorMessage" in script
+    assert "window.guardyMedApp" in script
+    assert 'attendance/cv/attempts' in script
     assert '"/auth/login"' in script
     assert '"/scheduling/departments"' in script
 
@@ -37,3 +40,6 @@ async def test_web_static_assets_exist_and_contain_expected_ui_markers(client: A
     assert "Manager planning workflow" in index
     assert "Worker workflow" in index
     assert "Manager review workflow" in index
+    assert 'x-data="guardyMedApp()"' in index
+    assert "alpinejs" in index
+    assert "Check in with face verification" in index

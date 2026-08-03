@@ -7,6 +7,29 @@ const state = {
   attendanceEnrollments: [],
   attendanceCaptureBase64: "",
   attendanceCameraStream: null,
+  attendanceMatchResults: {},
+  ui: {
+    flashVisible: false,
+    flashMessage: "",
+    flashKind: "success",
+    sessionChip: "Guest",
+    sessionSummary: "Load demo data first, then sign in with one of the role accounts above.",
+    heroKicker: "Start here",
+    heroTitle: "Choose a role and start",
+    heroCopy: "Load demo data, then sign in to see the workflow for that role.",
+    heroNoteTitle: "How this demo is structured",
+    heroNoteCopy: "Manager builds the month, worker requests changes, and manager review closes the loop.",
+    statusRole: "guest",
+    statusUser: "not logged in",
+    currentRole: "guest",
+    showLogin: true,
+    showLogout: false,
+    activeView: "",
+    summaryDepartments: "0",
+    summaryWorkers: "0",
+    summaryPeriods: "0",
+    summarySelectedPeriod: "None",
+  },
 };
 
 const els = {
@@ -114,6 +137,20 @@ const roleMeta = {
   },
 };
 
+window.guardyMedApp = function guardyMedApp() {
+  return {};
+};
+
+document.addEventListener("alpine:init", () => {
+  window.Alpine.store("ui", state.ui);
+});
+
+function syncAlpineUi() {
+  const store = window.Alpine?.store?.("ui");
+  if (!store) return;
+  Object.assign(store, state.ui);
+}
+
 async function api(path, options = {}) {
   const response = await fetch(`/api/v1${path}`, {
     credentials: "include",
@@ -165,12 +202,20 @@ function humanizeErrorMessage(message) {
 }
 
 function showFlash(message, kind = "success") {
+  state.ui.flashVisible = true;
+  state.ui.flashMessage = message;
+  state.ui.flashKind = kind;
+  syncAlpineUi();
   els.flash.hidden = false;
   els.flash.className = `flash ${kind}`;
   els.flash.textContent = message;
 }
 
 function clearFlash() {
+  state.ui.flashVisible = false;
+  state.ui.flashMessage = "";
+  state.ui.flashKind = "success";
+  syncAlpineUi();
   els.flash.hidden = true;
   els.flash.className = "flash";
   els.flash.textContent = "";
@@ -289,17 +334,39 @@ function periodLabel(period) {
 }
 
 function setOverviewCounts() {
-  els.summaryDepartments.textContent = String(state.departments.length);
-  els.summaryWorkers.textContent = String(state.workers.length);
-  els.summaryPeriods.textContent = String(state.periods.length);
+  state.ui.summaryDepartments = String(state.departments.length);
+  state.ui.summaryWorkers = String(state.workers.length);
+  state.ui.summaryPeriods = String(state.periods.length);
   const period = state.periods.find((item) => item.id === state.selectedPeriodId);
-  els.summarySelectedPeriod.textContent = period ? periodLabel(period) : "None";
+  state.ui.summarySelectedPeriod = period ? periodLabel(period) : "None";
+  syncAlpineUi();
+  els.summaryDepartments.textContent = state.ui.summaryDepartments;
+  els.summaryWorkers.textContent = state.ui.summaryWorkers;
+  els.summaryPeriods.textContent = state.ui.summaryPeriods;
+  els.summarySelectedPeriod.textContent = state.ui.summarySelectedPeriod;
 }
 
 function syncSessionUI() {
   const session = state.session;
   const role = session?.role || "guest";
   const meta = roleMeta[role];
+
+  state.ui.showLogin = !session;
+  state.ui.showLogout = Boolean(session);
+  state.ui.heroKicker = meta.kicker;
+  state.ui.heroTitle = meta.title;
+  state.ui.heroCopy = meta.copy;
+  state.ui.heroNoteTitle = meta.noteTitle;
+  state.ui.heroNoteCopy = meta.noteCopy;
+  state.ui.statusRole = role;
+  state.ui.statusUser = session ? session.email : "not logged in";
+  state.ui.sessionChip = session ? session.role : "Guest";
+  state.ui.sessionSummary = session
+    ? `${session.full_name} · ${session.role}`
+    : "Load demo data first, then sign in with one of the role accounts above.";
+  state.ui.currentRole = role;
+  state.ui.activeView = session?.role || "";
+  syncAlpineUi();
 
   els.loginButton.hidden = Boolean(session);
   els.logoutButton.hidden = !session;
@@ -576,8 +643,9 @@ function renderAttendanceAttempts(items, { workerScoped = false } = {}) {
   }
 
   els.attendanceAttemptList.innerHTML = items
-    .map(
-      (item) => `
+    .map((item) => {
+      const matchResult = state.attendanceMatchResults[item.id];
+      return `
         <article class="item">
           <div class="item-header">
             <div>
@@ -590,10 +658,21 @@ function renderAttendanceAttempts(items, { workerScoped = false } = {}) {
             <span class="${badgeClass(item.decision_status)}">${escapeHtml(item.decision_status)}</span>
           </div>
           ${item.evidence_ref ? `<p>${escapeHtml(item.evidence_ref)}</p>` : ""}
+          ${
+            matchResult
+              ? `
+                <div class="meta">
+                  <span>Route: ${escapeHtml(matchResult.route)}</span>
+                  <span>Score: ${Number(matchResult.similarity_score).toFixed(4)}</span>
+                  <span>${escapeHtml(matchResult.detector_name)}</span>
+                </div>
+              `
+              : ""
+          }
           ${item.review_reason ? `<p class="muted">${escapeHtml(item.review_reason)}</p>` : ""}
         </article>
-      `,
-    )
+      `;
+    })
     .join("");
 }
 
@@ -622,6 +701,7 @@ function renderReviewQueue(data) {
       status: item.decision_status,
       meta: [item.assignment_id, item.worker_id],
       reason: item.evidence_ref || "",
+      matchResult: state.attendanceMatchResults[item.id] || null,
     })),
   ];
 
@@ -642,6 +722,17 @@ function renderReviewQueue(data) {
             <span class="${badgeClass(item.status)}">${escapeHtml(item.status)}</span>
           </div>
           ${item.reason ? `<p>${escapeHtml(item.reason)}</p>` : ""}
+          ${
+            item.matchResult
+              ? `
+                <div class="meta">
+                  <span>Route: ${escapeHtml(item.matchResult.route)}</span>
+                  <span>Score: ${Number(item.matchResult.similarity_score).toFixed(4)}</span>
+                  <span>${escapeHtml(item.matchResult.detector_name)}</span>
+                </div>
+              `
+              : ""
+          }
           <div class="actions">
             <button class="primary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="approved" type="button">Approve</button>
             <button class="secondary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="rejected" type="button">Reject</button>
@@ -650,6 +741,25 @@ function renderReviewQueue(data) {
       `,
     )
     .join("");
+}
+
+async function hydrateAttendanceMatchResults(attempts) {
+  const cvAttempts = attempts.filter((item) => item.evidence_ref === "cv://inline-capture");
+  if (!cvAttempts.length) {
+    state.attendanceMatchResults = {};
+    return;
+  }
+  const results = await Promise.all(
+    cvAttempts.map(async (item) => {
+      try {
+        const result = await api(`/scheduling/attendance/cv/attempts/${item.id}/match-result`);
+        return [item.id, result];
+      } catch {
+        return [item.id, null];
+      }
+    }),
+  );
+  state.attendanceMatchResults = Object.fromEntries(results.filter(([, value]) => value));
 }
 
 function renderAudit(items) {
@@ -739,6 +849,7 @@ async function refreshWorkerData() {
   );
   renderWorkerRequests(requests.items);
   const attempts = await api("/scheduling/attendance/attempts");
+  await hydrateAttendanceMatchResults(attempts);
   renderAttendanceAttempts(attempts, { workerScoped: true });
   els.workerSummary.textContent = `${state.session.full_name} has ${assignments.items.length} assignments and ${requests.items.length} submitted requests in this demo session.`;
 }
@@ -749,6 +860,7 @@ async function refreshManagerReviewData() {
     api("/scheduling/audit-events"),
     api("/scheduling/attendance/review-queue"),
   ]);
+  await hydrateAttendanceMatchResults(attendanceAttempts);
   queue.attendance_attempts = attendanceAttempts;
   renderReviewQueue(queue);
   renderAudit(audit);

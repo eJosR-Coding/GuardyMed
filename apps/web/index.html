@@ -6,7 +6,7 @@
     <title>GuardyMed MVP</title>
     <link rel="stylesheet" href="/app/styles.css" />
   </head>
-  <body>
+  <body x-data="guardyMedApp()">
     <div class="shell">
       <aside class="sidebar">
         <div class="brand">
@@ -23,7 +23,7 @@
               <p class="eyebrow">Session</p>
               <h2>Sign in</h2>
             </div>
-            <span id="session-chip" class="badge">Guest</span>
+            <span id="session-chip" class="badge" x-text="$store.ui.sessionChip">Guest</span>
           </div>
 
           <div class="stack">
@@ -38,12 +38,12 @@
           </div>
 
           <div class="actions stretch">
-            <button id="login-button" class="primary" type="button">Log in</button>
+            <button id="login-button" class="primary" type="button" x-show="$store.ui.showLogin">Log in</button>
             <button id="load-demo" class="secondary" type="button">Load demo data</button>
-            <button id="logout-button" class="secondary" type="button" hidden>Log out</button>
+            <button id="logout-button" class="secondary" type="button" x-show="$store.ui.showLogout">Log out</button>
           </div>
 
-          <p id="session-summary" class="muted">
+          <p id="session-summary" class="muted" x-text="$store.ui.sessionSummary">
             Load demo data first, then sign in with one of the role accounts below.
           </p>
 
@@ -68,11 +68,11 @@
           </div>
 
           <div class="role-guide">
-            <article class="role-card" data-role-card="manager">
+            <article class="role-card" data-role-card="manager" :class="{ 'active': $store.ui.currentRole === 'manager' }">
               <strong>Manager</strong>
               <p>Builds the monthly roster, assigns staff, reviews requests, and validates attendance.</p>
             </article>
-            <article class="role-card" data-role-card="worker">
+            <article class="role-card" data-role-card="worker" :class="{ 'active': $store.ui.currentRole === 'worker' }">
               <strong>Worker</strong>
               <p>Checks assigned shifts, reports issues, and requests swaps or replacements.</p>
             </article>
@@ -80,17 +80,17 @@
         </section>
 
         <nav class="nav">
-          <button class="nav-link active" data-view="manager" hidden>Manager workspace</button>
-          <button class="nav-link" data-view="worker" hidden>Worker workspace</button>
+          <button class="nav-link active" data-view="manager" x-show="$store.ui.activeView === 'manager'">Manager workspace</button>
+          <button class="nav-link" data-view="worker" x-show="$store.ui.activeView === 'worker'">Worker workspace</button>
         </nav>
       </aside>
 
       <main class="content">
         <header class="hero">
           <div class="hero-copy">
-            <p id="hero-kicker" class="eyebrow">Current workspace</p>
-            <h2 id="hero-title">Choose a role and start</h2>
-            <p id="hero-copy" class="muted">
+            <p id="hero-kicker" class="eyebrow" x-text="$store.ui.heroKicker">Current workspace</p>
+            <h2 id="hero-title" x-text="$store.ui.heroTitle">Choose a role and start</h2>
+            <p id="hero-copy" class="muted" x-text="$store.ui.heroCopy">
               This demo is organized by role. Each person sees a different operational workflow.
             </p>
           </div>
@@ -99,42 +99,42 @@
             <div class="status-card">
               <span class="status-dot"></span>
               <div>
-                <strong id="status-role">guest</strong>
-                <p id="status-user" class="muted">not logged in</p>
+                <strong id="status-role" x-text="$store.ui.statusRole">guest</strong>
+                <p id="status-user" class="muted" x-text="$store.ui.statusUser">not logged in</p>
               </div>
             </div>
 
             <div class="hero-note">
-              <strong id="hero-note-title">What happens here</strong>
-              <p id="hero-note-copy" class="muted">
+              <strong id="hero-note-title" x-text="$store.ui.heroNoteTitle">What happens here</strong>
+              <p id="hero-note-copy" class="muted" x-text="$store.ui.heroNoteCopy">
                 Managers create the month, workers request changes, and managers validate and export.
               </p>
             </div>
           </div>
         </header>
 
-        <p id="flash" class="flash" hidden></p>
+        <p id="flash" class="flash" x-show="$store.ui.flashVisible" :class="$store.ui.flashKind" x-text="$store.ui.flashMessage" hidden></p>
 
         <section id="overview-panel" class="overview-panel">
           <div class="overview-card">
             <span class="overview-label">Departments</span>
-            <strong id="summary-departments">0</strong>
+            <strong id="summary-departments" x-text="$store.ui.summaryDepartments">0</strong>
           </div>
           <div class="overview-card">
             <span class="overview-label">Workers</span>
-            <strong id="summary-workers">0</strong>
+            <strong id="summary-workers" x-text="$store.ui.summaryWorkers">0</strong>
           </div>
           <div class="overview-card">
             <span class="overview-label">Periods</span>
-            <strong id="summary-periods">0</strong>
+            <strong id="summary-periods" x-text="$store.ui.summaryPeriods">0</strong>
           </div>
           <div class="overview-card">
             <span class="overview-label">Selected period</span>
-            <strong id="summary-selected-period">None</strong>
+            <strong id="summary-selected-period" x-text="$store.ui.summarySelectedPeriod">None</strong>
           </div>
         </section>
 
-        <section id="view-manager" class="view active">
+        <section id="view-manager" class="view active" x-show="$store.ui.activeView === 'manager'">
           <section class="panel">
             <div class="panel-header stack-on-mobile">
               <div>
@@ -395,7 +395,7 @@
           </div>
         </section>
 
-        <section id="view-worker" class="view">
+        <section id="view-worker" class="view" x-show="$store.ui.activeView === 'worker'">
           <section class="panel">
             <div class="panel-header stack-on-mobile">
               <div>
@@ -522,7 +522,7 @@
           </div>
         </section>
 
-        <section id="view-manager-review" class="view">
+        <section id="view-manager-review" class="view" x-show="$store.ui.activeView === 'manager'">
           <section class="panel">
             <div class="panel-header stack-on-mobile">
               <div>
@@ -564,6 +564,7 @@
       </main>
     </div>
 
-    <script type="module" src="/app/app.js"></script>
+    <script defer src="/app/app.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   </body>
 </html>

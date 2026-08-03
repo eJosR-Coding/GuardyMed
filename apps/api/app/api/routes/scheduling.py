@@ -150,6 +150,21 @@ async def create_face_verification_attempt(
     )
 
 
+@router.get("/attendance/cv/attempts/{attempt_id}/match-result", response_model=AttendanceMatchResultRead)
+async def get_face_verification_match_result(
+    attempt_id: str,
+    auth: AuthContext = Depends(get_auth_context),
+) -> AttendanceMatchResultRead:
+    attempt = service.get_attendance_attempt(attempt_id)
+    if auth.role == UserRole.WORKER and attempt.worker_id != _require_worker_identity(auth):
+        raise _forbidden("worker can only access own attendance evidence")
+    if auth.role == UserRole.MANAGER:
+        period = service.get_period(service.get_assignment(attempt.assignment_id).schedule_period_id)
+        _require_department_access(auth, period.department_id)
+    result = attendance_cv_workflow.get_match_result(attempt_id)
+    return AttendanceMatchResultRead.model_validate(result)
+
+
 @router.get("/attendance/attempts", response_model=list[AttendanceAttemptRead])
 async def list_attendance_attempts(
     auth: AuthContext = Depends(get_auth_context),
