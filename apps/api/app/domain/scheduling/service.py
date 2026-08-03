@@ -10,6 +10,11 @@ from apps.api.app.domain.scheduling.entities import (
     ApprovalDecisionType,
     ApprovalTargetType,
     AssignmentType,
+    AttendanceAttempt,
+    AttendanceAttemptType,
+    AttendanceDecisionStatus,
+    AttendanceEnrollment,
+    AttendanceEnrollmentStatus,
     AuditEvent,
     ChangeRequest,
     ChangeRequestStatus,
@@ -28,13 +33,21 @@ from apps.api.app.domain.scheduling.rules import (
     SYSTEM_ACTOR_ID,
     AuditAction,
     build_export_lines,
+    ensure_no_assignment_overlap,
+    ensure_unique_department_code,
+    ensure_unique_schedule_period,
+    ensure_unique_worker_document,
     next_change_request_status_from_decision,
     next_schedule_period_status_from_decision,
     require_pending_change_request,
+    validate_schedule_period_editable,
+    validate_schedule_period_status_transition,
     validate_change_request_status_transition,
     validate_exportable_period,
     validate_month,
     validate_time_window,
+    require_active_attendance_enrollment,
+    require_pending_attendance_attempt,
 )
 
 
@@ -43,6 +56,7 @@ class SchedulingService:
         self.repository = repository
 
     def create_department(self, *, name: str, code: str) -> Department:
+        ensure_unique_department_code({item.code.casefold() for item in self.repository.list_departments()}, code.casefold())
         department = Department(id=self._new_id("dep"), name=name, code=code)
         created = self.repository.create_department(department)
         self._record_event(
@@ -66,6 +80,10 @@ class SchedulingService:
         department_id: str,
     ) -> Worker:
         self._require_department(department_id)
+        ensure_unique_worker_document(
+            {item.document_id.casefold() for item in self.repository.list_workers()},
+            document_id.casefold(),
+        )
         worker = Worker(
             id=self._new_id("wrk"),
             full_name=full_name,
@@ -98,6 +116,12 @@ class SchedulingService:
     ) -> SchedulePeriod:
         self._require_department(department_id)
         validate_month(month)
+        ensure_unique_schedule_period(
+            {(item.department_id, item.year, item.month) for item in self.repository.list_periods()},
+            department_id,
+            year,
+            month,
+        )
         period = SchedulePeriod(
             id=self._new_id("sp"),
             year=year,
@@ -128,6 +152,7 @@ class SchedulingService:
 
     def update_period_status(self, period_id: str, *, status_value: SchedulePeriodStatus) -> SchedulePeriod:
         period = self.get_period(period_id)
+        validate_schedule_period_status_transition(current_status=period.status, next_status=status_value)
         period.status = status_value
         updated = self.repository.update_period(period)
         self._record_event(
@@ -154,7 +179,13 @@ class SchedulingService:
         worker = self._require_worker(worker_id)
         if worker.department_id != period.department_id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="worker does not belong to the schedule department")
+        validate_schedule_period_editable(period.status)
         validate_time_window(start_time=start_time, end_time=end_time)
+        overlaps = any(
+            item.shift_date == shift_date and start_time < item.end_time and end_time > item.start_time
+            for item in self.repository.list_assignments_for_worker(worker_id)
+        )
+        ensure_no_assignment_overlap(overlaps)
         assignment = ShiftAssignment(
             id=self._new_id("asg"),
             schedule_period_id=period_id,
@@ -186,7 +217,17 @@ class SchedulingService:
         assignment = self.repository.get_assignment(assignment_id)
         if assignment is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assignment not found")
+        period = self.get_period(assignment.schedule_period_id)
+        validate_schedule_period_editable(period.status)
         validate_time_window(start_time=start_time, end_time=end_time)
+        overlaps = any(
+            item.id != assignment.id
+            and item.shift_date == assignment.shift_date
+            and start_time < item.end_time
+            and end_time > item.start_time
+            for item in self.repository.list_assignments_for_worker(assignment.worker_id)
+        )
+        ensure_no_assignment_overlap(overlaps)
         assignment.start_time = start_time
         assignment.end_time = end_time
         assignment.notes = notes
@@ -225,11 +266,11 @@ class SchedulingService:
         reason: str,
         replacement_worker_id: str | None,
     ) -> ChangeRequest:
-        assignment = self.repository.get_assignment(assignment_id)
-        if assignment is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assignment not found")
+        assignment = self.get_assignment(assignment_id)
         if not reason.strip():
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="reason is required")
+        if assignment.worker_id != requested_by:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker can only request changes for own assignments")
         if replacement_worker_id is not None:
             self._require_worker(replacement_worker_id)
         change_request = ChangeRequest(
@@ -444,6 +485,13 @@ class SchedulingService:
             reason="Medical appointment overlap",
             replacement_worker_id=worker_3.id,
         )
+        self.create_attendance_enrollment(worker_id=worker_1.id, created_by="coord_demo")
+        self.create_attendance_attempt(
+            worker_id=worker_1.id,
+            assignment_id=assignment_1.id,
+            attempt_type=AttendanceAttemptType.CHECK_IN,
+            evidence_ref="manual://demo-check-in",
+        )
 
         return {
             "seeded": True,
@@ -453,6 +501,107 @@ class SchedulingService:
             "assignments": 3,
             "change_requests": 1,
         }
+
+    def create_attendance_enrollment(self, *, worker_id: str, created_by: str) -> AttendanceEnrollment:
+        self._require_worker(worker_id)
+        existing = self.repository.get_attendance_enrollment_by_worker(worker_id)
+        if existing is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="attendance enrollment already exists for worker")
+        enrollment = AttendanceEnrollment(
+            id=self._new_id("aen"),
+            worker_id=worker_id,
+            status=AttendanceEnrollmentStatus.ACTIVE,
+            created_by=created_by.strip() or SYSTEM_ACTOR_ID,
+            created_at=datetime.now(timezone.utc),
+        )
+        created = self.repository.create_attendance_enrollment(enrollment)
+        self._record_event(
+            actor_id=created.created_by,
+            entity_type="attendance_enrollment",
+            entity_id=created.id,
+            action=AuditAction.ATTENDANCE_ENROLLMENT_CREATED,
+            payload={"worker_id": created.worker_id, "status": created.status},
+        )
+        return created
+
+    def list_attendance_enrollments(self, *, worker_id: str | None = None) -> list[AttendanceEnrollment]:
+        if worker_id is not None:
+            self._require_worker(worker_id)
+        return self.repository.list_attendance_enrollments(worker_id=worker_id)
+
+    def create_attendance_attempt(
+        self,
+        *,
+        worker_id: str,
+        assignment_id: str,
+        attempt_type: AttendanceAttemptType,
+        evidence_ref: str | None,
+    ) -> AttendanceAttempt:
+        self._require_worker(worker_id)
+        assignment = self.get_assignment(assignment_id)
+        if assignment.worker_id != worker_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker can only submit attendance for own assignments")
+        enrollment = self.repository.get_attendance_enrollment_by_worker(worker_id)
+        require_active_attendance_enrollment(enrollment is not None and enrollment.status == AttendanceEnrollmentStatus.ACTIVE)
+        attempt = AttendanceAttempt(
+            id=self._new_id("aat"),
+            worker_id=worker_id,
+            assignment_id=assignment_id,
+            attempt_type=attempt_type,
+            evidence_ref=evidence_ref.strip() if evidence_ref else None,
+            attempted_at=datetime.now(timezone.utc),
+        )
+        created = self.repository.create_attendance_attempt(attempt)
+        self._record_event(
+            actor_id=created.worker_id,
+            entity_type="attendance_attempt",
+            entity_id=created.id,
+            action=AuditAction.ATTENDANCE_ATTEMPT_CREATED,
+            payload={"assignment_id": created.assignment_id, "attempt_type": created.attempt_type},
+        )
+        return created
+
+    def get_attendance_attempt(self, attempt_id: str) -> AttendanceAttempt:
+        attempt = self.repository.get_attendance_attempt(attempt_id)
+        if attempt is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="attendance attempt not found")
+        return attempt
+
+    def list_attendance_attempts(
+        self,
+        *,
+        worker_id: str | None = None,
+        pending_only: bool = False,
+    ) -> list[AttendanceAttempt]:
+        if worker_id is not None:
+            self._require_worker(worker_id)
+        return self.repository.list_attendance_attempts(worker_id=worker_id, pending_only=pending_only)
+
+    def review_attendance_attempt(
+        self,
+        attempt_id: str,
+        *,
+        decision_status: AttendanceDecisionStatus,
+        decided_by: str,
+        review_reason: str | None,
+    ) -> AttendanceAttempt:
+        attempt = self.get_attendance_attempt(attempt_id)
+        require_pending_attendance_attempt(attempt.decision_status)
+        if decision_status == AttendanceDecisionStatus.PENDING:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="decision status must be accepted or rejected")
+        attempt.decision_status = decision_status
+        attempt.decided_by = decided_by.strip()
+        attempt.review_reason = review_reason.strip() if review_reason else None
+        attempt.decided_at = datetime.now(timezone.utc)
+        updated = self.repository.update_attendance_attempt(attempt)
+        self._record_event(
+            actor_id=updated.decided_by or SYSTEM_ACTOR_ID,
+            entity_type="attendance_attempt",
+            entity_id=updated.id,
+            action=AuditAction.ATTENDANCE_ATTEMPT_REVIEWED,
+            payload={"decision_status": updated.decision_status, "assignment_id": updated.assignment_id},
+        )
+        return updated
 
     def _require_department(self, department_id: str) -> Department:
         department = self.repository.get_department(department_id)

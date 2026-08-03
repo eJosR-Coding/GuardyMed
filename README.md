@@ -25,8 +25,8 @@ It currently includes:
 
 - a FastAPI backend scaffold
 - a mounted browser MVP under `/app`
-- role-based scheduling workflows for coordinator, worker, and approver
-- scheduling, change request, approval, audit, and export endpoints
+- session-based workflows for coordinator, worker, and approver
+- scheduling, change request, approval, audit, export, and attendance scaffold endpoints
 - an initial Phase A system definition and architecture direction
 
 ## Solution Direction
@@ -35,8 +35,11 @@ GuardyMed currently solves the operational core first:
 
 - build a monthly schedule period
 - assign staff to guard shifts
+- enroll workers for attendance
+- let workers submit manual attendance attempts
 - let workers submit change requests
 - let approvers review queue items
+- let approvers review attendance attempts
 - preserve audit events
 - generate monthly exports
 
@@ -77,6 +80,8 @@ Current core entities:
 - Worker
 - SchedulePeriod
 - ShiftAssignment
+- AttendanceEnrollment
+- AttendanceAttempt
 - ChangeRequest
 - ApprovalDecision
 - AuditEvent
@@ -88,8 +93,9 @@ Base path: `/api/v1/scheduling`
 
 Auth model for the current MVP:
 
-- `x-user-id`
-- `x-user-role`
+- session cookie via `/api/v1/auth/login`
+- demo bootstrap via `/api/v1/auth/bootstrap-demo`
+- mounted UI uses cookie-backed auth
 
 Supported roles:
 
@@ -99,12 +105,23 @@ Supported roles:
 
 Implemented endpoints:
 
+- `POST /auth/bootstrap-demo`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/session`
 - `GET /capabilities`
+- `GET /attendance/capabilities`
 - `POST /demo/seed`
 - `GET /departments`
 - `POST /departments`
 - `GET /workers`
 - `POST /workers`
+- `GET /attendance/enrollments`
+- `POST /attendance/enrollments`
+- `GET /attendance/attempts`
+- `POST /attendance/attempts`
+- `GET /attendance/review-queue`
+- `PATCH /attendance/attempts/{attempt_id}`
 - `GET /schedule-periods`
 - `POST /schedule-periods`
 - `GET /schedule-periods/{period_id}`
@@ -128,7 +145,7 @@ Quick local run:
 
 - `uv run uvicorn apps.api.app.main:app --reload`
 - open `http://127.0.0.1:8000/app`
-- load demo data from the session panel or call `POST /api/v1/scheduling/demo/seed`
+- load demo data from the session panel or call `POST /api/v1/auth/bootstrap-demo`
 
 ## Repository Structure
 
@@ -150,15 +167,15 @@ Quick local run:
 Current status:
 
 - backend Phase A scheduling core is implemented
-- auth headers and role guards are implemented
+- session auth and role guards are implemented
 - persistence is available through SQLAlchemy
 - a browser MVP is available from the same FastAPI app
+- manual attendance scaffold is available for enrollment, submission, and review
 - test suite is green with `uv run pytest`
 
 ## Roadmap
 
-- merge current Phase A browser MVP into `dev`
-- replace header-based demo auth with a real session/auth flow
-- add ownership checks for worker-scoped data
+- harden authorization and validation edges further
 - add stronger export and audit filters
+- replace manual attendance evidence with a CV-assisted pipeline later
 - add AI/CV modules only after the scheduling core is stable

@@ -1,71 +1,113 @@
-import asyncio
-
 from fastapi import HTTPException
 
-from apps.api.app.api.auth import UserRole, get_auth_context, require_roles, resolve_auth_context
+from apps.api.app.api.auth import (
+    UserRole,
+    build_auth_context,
+    create_session_for_user,
+    create_user,
+    get_user_by_email,
+    hash_password,
+    resolve_auth_context,
+    verify_password,
+)
 from apps.api.app.main import app
 
 
-def test_missing_auth_headers_are_rejected() -> None:
-    try:
-        resolve_auth_context(user_id=None, user_role=None)
-    except HTTPException as exc:
-        assert exc.status_code == 401
-        assert exc.detail == "missing auth headers"
-    else:
-        raise AssertionError("expected auth context resolution to fail")
+def ensure_demo_user():
+    return create_user(
+        email="coord@guardymed.local",
+        full_name="Demo Coordinator",
+        password="password123",
+        role=UserRole.COORDINATOR,
+        department_id="dep_demo",
+    )
 
 
-def test_invalid_role_is_rejected() -> None:
-    try:
-        resolve_auth_context(user_id="user_1", user_role="admin")
-    except HTTPException as exc:
-        assert exc.status_code == 403
-        assert exc.detail == "invalid user role"
-    else:
-        raise AssertionError("expected invalid role to fail")
+def test_password_hash_and_verify() -> None:
+    password_hash = hash_password("password123")
+
+    assert verify_password("password123", password_hash) is True
+    assert verify_password("wrong-pass", password_hash) is False
 
 
-def test_valid_auth_context_is_built() -> None:
-    auth = resolve_auth_context(user_id="coord_1", user_role="coordinator")
+def test_create_and_fetch_user() -> None:
+    user = ensure_demo_user()
+    fetched = get_user_by_email("coord@guardymed.local")
 
-    assert auth.user_id == "coord_1"
+    assert fetched is not None
+    assert fetched.id == user.id
+    assert fetched.role == UserRole.COORDINATOR
+
+
+def test_create_user_updates_existing_demo_links() -> None:
+    first = create_user(
+        email="worker@guardymed.local",
+        full_name="Old Worker",
+        password="password123",
+        role=UserRole.WORKER,
+        worker_id="wrk_old",
+        department_id="dep_old",
+    )
+
+    updated = create_user(
+        email="worker@guardymed.local",
+        full_name="Ana Ruiz",
+        password="password123",
+        role=UserRole.WORKER,
+        worker_id="wrk_new",
+        department_id="dep_new",
+    )
+
+    fetched = get_user_by_email("worker@guardymed.local")
+
+    assert updated.id == first.id
+    assert fetched is not None
+    assert fetched.full_name == "Ana Ruiz"
+    assert fetched.worker_id == "wrk_new"
+    assert fetched.department_id == "dep_new"
+
+
+def test_session_context_resolves_from_session_id() -> None:
+    user = ensure_demo_user()
+    session_id = create_session_for_user(user)
+
+    auth = resolve_auth_context(session_id=session_id)
+
+    assert auth.user_id == user.id
+    assert auth.email == "coord@guardymed.local"
     assert auth.role == UserRole.COORDINATOR
 
 
-def test_role_guard_rejects_forbidden_role() -> None:
-    guard = require_roles(UserRole.COORDINATOR)
-    worker_auth = asyncio.run(get_auth_context(x_user_id="worker_1", x_user_role="worker"))
-
+def test_missing_session_is_rejected() -> None:
     try:
-        asyncio.run(guard(worker_auth))
+        resolve_auth_context(session_id=None)
     except HTTPException as exc:
-        assert exc.status_code == 403
-        assert exc.detail == "forbidden"
+        assert exc.status_code == 401
+        assert exc.detail == "missing session"
     else:
-        raise AssertionError("expected role guard to fail")
+        raise AssertionError("expected missing session to fail")
 
 
-def test_role_guard_accepts_allowed_role() -> None:
-    guard = require_roles(UserRole.APPROVER)
-    approver_auth = asyncio.run(get_auth_context(x_user_id="approver_1", x_user_role="approver"))
+def test_invalid_session_is_rejected() -> None:
+    try:
+        resolve_auth_context(session_id="ses_missing")
+    except HTTPException as exc:
+        assert exc.status_code == 401
+        assert exc.detail == "invalid session"
+    else:
+        raise AssertionError("expected invalid session to fail")
 
-    resolved = asyncio.run(guard(approver_auth))
 
-    assert resolved.user_id == "approver_1"
-    assert resolved.role == UserRole.APPROVER
-
-
-def test_auth_protected_routes_are_registered() -> None:
+def test_auth_and_app_routes_are_registered() -> None:
     paths = {route.path for route in app.routes}
 
+    assert "/api/v1/auth/bootstrap-demo" in paths
+    assert "/api/v1/auth/login" in paths
+    assert "/api/v1/auth/logout" in paths
+    assert "/api/v1/auth/session" in paths
     assert "/api/v1/scheduling/departments" in paths
-    assert "/api/v1/scheduling/demo/seed" in paths
-    assert "/api/v1/scheduling/workers" in paths
-    assert "/api/v1/scheduling/schedule-periods" in paths
-    assert "/api/v1/scheduling/change-requests" in paths
     assert "/api/v1/scheduling/review-queue" in paths
-    assert "/api/v1/scheduling/approval-decisions" in paths
-    assert "/api/v1/scheduling/audit-events" in paths
+    assert "/api/v1/scheduling/attendance/enrollments" in paths
+    assert "/api/v1/scheduling/attendance/attempts" in paths
     assert "/app" in paths
     assert "/" in paths

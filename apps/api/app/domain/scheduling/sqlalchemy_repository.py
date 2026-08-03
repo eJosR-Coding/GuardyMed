@@ -9,6 +9,11 @@ from apps.api.app.domain.scheduling.entities import (
     ApprovalDecisionType,
     ApprovalTargetType,
     AssignmentType,
+    AttendanceAttempt,
+    AttendanceAttemptType,
+    AttendanceDecisionStatus,
+    AttendanceEnrollment,
+    AttendanceEnrollmentStatus,
     AuditEvent,
     ChangeRequest,
     ChangeRequestStatus,
@@ -23,6 +28,8 @@ from apps.api.app.domain.scheduling.entities import (
 )
 from apps.api.app.infra.db import (
     ApprovalDecisionRow,
+    AttendanceAttemptRow,
+    AttendanceEnrollmentRow,
     AuditEventRow,
     ChangeRequestRow,
     DepartmentRow,
@@ -265,6 +272,90 @@ class SQLAlchemySchedulingRepository:
             ).all()
             return [self._export_from_row(row) for row in rows]
 
+    def create_attendance_enrollment(self, enrollment: AttendanceEnrollment) -> AttendanceEnrollment:
+        row = AttendanceEnrollmentRow(
+            id=enrollment.id,
+            worker_id=enrollment.worker_id,
+            status=enrollment.status,
+            created_by=enrollment.created_by,
+            created_at=enrollment.created_at,
+        )
+        with session_scope(self.session_factory) as session:
+            session.add(row)
+        return enrollment
+
+    def get_attendance_enrollment_by_worker(self, worker_id: str) -> AttendanceEnrollment | None:
+        with session_scope(self.session_factory) as session:
+            row = session.scalar(select(AttendanceEnrollmentRow).where(AttendanceEnrollmentRow.worker_id == worker_id))
+            return None if row is None else self._attendance_enrollment_from_row(row)
+
+    def list_attendance_enrollments(self, worker_id: str | None = None) -> list[AttendanceEnrollment]:
+        statement = select(AttendanceEnrollmentRow).order_by(AttendanceEnrollmentRow.created_at)
+        if worker_id is not None:
+            statement = statement.where(AttendanceEnrollmentRow.worker_id == worker_id)
+        with session_scope(self.session_factory) as session:
+            rows = session.scalars(statement).all()
+            return [self._attendance_enrollment_from_row(row) for row in rows]
+
+    def update_attendance_enrollment(self, enrollment: AttendanceEnrollment) -> AttendanceEnrollment:
+        with session_scope(self.session_factory) as session:
+            row = session.get(AttendanceEnrollmentRow, enrollment.id)
+            if row is None:
+                raise KeyError(enrollment.id)
+            row.status = enrollment.status
+            row.created_by = enrollment.created_by
+            row.created_at = enrollment.created_at
+        return enrollment
+
+    def create_attendance_attempt(self, attempt: AttendanceAttempt) -> AttendanceAttempt:
+        row = AttendanceAttemptRow(
+            id=attempt.id,
+            worker_id=attempt.worker_id,
+            assignment_id=attempt.assignment_id,
+            attempt_type=attempt.attempt_type,
+            evidence_ref=attempt.evidence_ref,
+            attempted_at=attempt.attempted_at,
+            decision_status=attempt.decision_status,
+            review_reason=attempt.review_reason,
+            decided_by=attempt.decided_by,
+            decided_at=attempt.decided_at,
+        )
+        with session_scope(self.session_factory) as session:
+            session.add(row)
+        return attempt
+
+    def get_attendance_attempt(self, attempt_id: str) -> AttendanceAttempt | None:
+        with session_scope(self.session_factory) as session:
+            row = session.get(AttendanceAttemptRow, attempt_id)
+            return None if row is None else self._attendance_attempt_from_row(row)
+
+    def list_attendance_attempts(
+        self,
+        *,
+        worker_id: str | None = None,
+        pending_only: bool = False,
+    ) -> list[AttendanceAttempt]:
+        statement = select(AttendanceAttemptRow).order_by(AttendanceAttemptRow.attempted_at.desc())
+        if worker_id is not None:
+            statement = statement.where(AttendanceAttemptRow.worker_id == worker_id)
+        if pending_only:
+            statement = statement.where(AttendanceAttemptRow.decision_status == AttendanceDecisionStatus.PENDING)
+        with session_scope(self.session_factory) as session:
+            rows = session.scalars(statement).all()
+            return [self._attendance_attempt_from_row(row) for row in rows]
+
+    def update_attendance_attempt(self, attempt: AttendanceAttempt) -> AttendanceAttempt:
+        with session_scope(self.session_factory) as session:
+            row = session.get(AttendanceAttemptRow, attempt.id)
+            if row is None:
+                raise KeyError(attempt.id)
+            row.evidence_ref = attempt.evidence_ref
+            row.decision_status = attempt.decision_status
+            row.review_reason = attempt.review_reason
+            row.decided_by = attempt.decided_by
+            row.decided_at = attempt.decided_at
+        return attempt
+
     @staticmethod
     def _worker_from_row(row: WorkerRow) -> Worker:
         return Worker(
@@ -332,4 +423,29 @@ class SQLAlchemySchedulingRepository:
             created_by=row.created_by,
             content=row.content,
             created_at=row.created_at,
+        )
+
+    @staticmethod
+    def _attendance_enrollment_from_row(row: AttendanceEnrollmentRow) -> AttendanceEnrollment:
+        return AttendanceEnrollment(
+            id=row.id,
+            worker_id=row.worker_id,
+            status=AttendanceEnrollmentStatus(row.status),
+            created_by=row.created_by,
+            created_at=row.created_at,
+        )
+
+    @staticmethod
+    def _attendance_attempt_from_row(row: AttendanceAttemptRow) -> AttendanceAttempt:
+        return AttendanceAttempt(
+            id=row.id,
+            worker_id=row.worker_id,
+            assignment_id=row.assignment_id,
+            attempt_type=AttendanceAttemptType(row.attempt_type),
+            evidence_ref=row.evidence_ref,
+            attempted_at=row.attempted_at,
+            decision_status=AttendanceDecisionStatus(row.decision_status),
+            review_reason=row.review_reason,
+            decided_by=row.decided_by,
+            decided_at=row.decided_at,
         )

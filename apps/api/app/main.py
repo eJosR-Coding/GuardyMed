@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from apps.api.app.api.routes.auth import router as auth_router
 from apps.api.app.api.routes.health import router as health_router
 from apps.api.app.api.routes.scheduling import router as scheduling_router
 from apps.api.app.core.config import settings
@@ -17,6 +18,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
     app.include_router(health_router)
+    app.include_router(auth_router, prefix="/api/v1")
     app.include_router(scheduling_router, prefix="/api/v1")
     web_dir = Path(__file__).resolve().parents[2] / "web"
     if web_dir.exists():

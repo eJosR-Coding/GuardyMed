@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 
 from apps.api.app.domain.scheduling.entities import (
     ApprovalDecisionType,
+    AttendanceDecisionStatus,
     ChangeRequestStatus,
     ExportType,
     SchedulePeriodStatus,
@@ -25,6 +26,9 @@ class AuditAction:
     CHANGE_REQUEST_REVIEWED = "change_request.reviewed"
     APPROVAL_DECISION_CREATED = "approval_decision.created"
     EXPORT_CREATED = "export.created"
+    ATTENDANCE_ENROLLMENT_CREATED = "attendance_enrollment.created"
+    ATTENDANCE_ATTEMPT_CREATED = "attendance_attempt.created"
+    ATTENDANCE_ATTEMPT_REVIEWED = "attendance_attempt.reviewed"
 
 
 def validate_month(month: int) -> None:
@@ -40,6 +44,66 @@ def validate_time_window(*, start_time, end_time) -> None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="end_time must be after start_time",
+        )
+
+
+def validate_schedule_period_editable(status_value: SchedulePeriodStatus) -> None:
+    if status_value != SchedulePeriodStatus.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="schedule period must be draft to edit assignments",
+        )
+
+
+def validate_schedule_period_status_transition(
+    *,
+    current_status: SchedulePeriodStatus,
+    next_status: SchedulePeriodStatus,
+) -> None:
+    allowed = {
+        SchedulePeriodStatus.DRAFT: {SchedulePeriodStatus.IN_REVIEW},
+        SchedulePeriodStatus.IN_REVIEW: {SchedulePeriodStatus.DRAFT, SchedulePeriodStatus.APPROVED},
+        SchedulePeriodStatus.APPROVED: {SchedulePeriodStatus.CLOSED},
+        SchedulePeriodStatus.CLOSED: set(),
+    }
+    if next_status == current_status:
+        return
+    if next_status not in allowed[current_status]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="invalid schedule period status transition",
+        )
+
+
+def ensure_unique_department_code(existing_codes: set[str], code: str) -> None:
+    if code.casefold() in existing_codes:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="department code already exists",
+        )
+
+
+def ensure_unique_worker_document(existing_document_ids: set[str], document_id: str) -> None:
+    if document_id.casefold() in existing_document_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="worker document_id already exists",
+        )
+
+
+def ensure_unique_schedule_period(existing_period_keys: set[tuple[str, int, int]], department_id: str, year: int, month: int) -> None:
+    if (department_id, year, month) in existing_period_keys:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="schedule period already exists for department and month",
+        )
+
+
+def ensure_no_assignment_overlap(overlaps: bool) -> None:
+    if overlaps:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="worker already has an overlapping assignment",
         )
 
 
@@ -123,3 +187,19 @@ def build_export_lines(
         f"assignments={assignment_count}",
         f"workers={worker_count}",
     ]
+
+
+def require_active_attendance_enrollment(is_active: bool) -> None:
+    if not is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="worker must have an active attendance enrollment",
+        )
+
+
+def require_pending_attendance_attempt(status_value: AttendanceDecisionStatus) -> None:
+    if status_value != AttendanceDecisionStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="only pending attendance attempts can be reviewed",
+        )

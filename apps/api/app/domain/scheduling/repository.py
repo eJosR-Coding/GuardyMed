@@ -4,6 +4,8 @@ from collections import defaultdict
 
 from apps.api.app.domain.scheduling.entities import (
     ApprovalDecision,
+    AttendanceAttempt,
+    AttendanceEnrollment,
     AuditEvent,
     ChangeRequest,
     Department,
@@ -28,6 +30,9 @@ class InMemorySchedulingRepository:
         self.audit_events_by_entity: dict[tuple[str, str], list[str]] = defaultdict(list)
         self.exports: dict[str, ExportJob] = {}
         self.exports_by_period: dict[str, list[str]] = defaultdict(list)
+        self.attendance_enrollments: dict[str, AttendanceEnrollment] = {}
+        self.attendance_enrollment_by_worker: dict[str, str] = {}
+        self.attendance_attempts: dict[str, AttendanceAttempt] = {}
 
     def create_department(self, department: Department) -> Department:
         self.departments[department.id] = department
@@ -139,3 +144,49 @@ class InMemorySchedulingRepository:
     def list_exports_for_period(self, period_id: str) -> list[ExportJob]:
         ids = self.exports_by_period[period_id]
         return [self.exports[item_id] for item_id in ids]
+
+    def create_attendance_enrollment(self, enrollment: AttendanceEnrollment) -> AttendanceEnrollment:
+        self.attendance_enrollments[enrollment.id] = enrollment
+        self.attendance_enrollment_by_worker[enrollment.worker_id] = enrollment.id
+        return enrollment
+
+    def get_attendance_enrollment_by_worker(self, worker_id: str) -> AttendanceEnrollment | None:
+        enrollment_id = self.attendance_enrollment_by_worker.get(worker_id)
+        if enrollment_id is None:
+            return None
+        return self.attendance_enrollments.get(enrollment_id)
+
+    def list_attendance_enrollments(self, worker_id: str | None = None) -> list[AttendanceEnrollment]:
+        items = list(self.attendance_enrollments.values())
+        if worker_id is not None:
+            items = [item for item in items if item.worker_id == worker_id]
+        return sorted(items, key=lambda item: (item.created_at, item.id))
+
+    def update_attendance_enrollment(self, enrollment: AttendanceEnrollment) -> AttendanceEnrollment:
+        self.attendance_enrollments[enrollment.id] = enrollment
+        self.attendance_enrollment_by_worker[enrollment.worker_id] = enrollment.id
+        return enrollment
+
+    def create_attendance_attempt(self, attempt: AttendanceAttempt) -> AttendanceAttempt:
+        self.attendance_attempts[attempt.id] = attempt
+        return attempt
+
+    def get_attendance_attempt(self, attempt_id: str) -> AttendanceAttempt | None:
+        return self.attendance_attempts.get(attempt_id)
+
+    def list_attendance_attempts(
+        self,
+        *,
+        worker_id: str | None = None,
+        pending_only: bool = False,
+    ) -> list[AttendanceAttempt]:
+        items = list(self.attendance_attempts.values())
+        if worker_id is not None:
+            items = [item for item in items if item.worker_id == worker_id]
+        if pending_only:
+            items = [item for item in items if item.decision_status == "pending"]
+        return sorted(items, key=lambda item: (item.attempted_at, item.id), reverse=True)
+
+    def update_attendance_attempt(self, attempt: AttendanceAttempt) -> AttendanceAttempt:
+        self.attendance_attempts[attempt.id] = attempt
+        return attempt
