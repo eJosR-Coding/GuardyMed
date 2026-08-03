@@ -31,12 +31,12 @@ const els = {
   summarySelectedPeriod: document.querySelector("#summary-selected-period"),
   calendarSummary: document.querySelector("#calendar-summary"),
   workerSummary: document.querySelector("#worker-summary"),
-  approverSummary: document.querySelector("#approver-summary"),
+  managerReviewSummary: document.querySelector("#manager-review-summary"),
   views: {
-    coordinator: document.querySelector("#view-coordinator"),
+    manager: document.querySelector("#view-manager"),
     worker: document.querySelector("#view-worker"),
-    approver: document.querySelector("#view-approver"),
   },
+  managerReviewView: document.querySelector("#view-manager-review"),
   departmentForm: document.querySelector("#department-form"),
   workerForm: document.querySelector("#worker-form"),
   periodForm: document.querySelector("#period-form"),
@@ -83,14 +83,14 @@ const roleMeta = {
     copy: "Load demo data, then sign in to see the workflow for that role.",
     noteTitle: "How this demo is structured",
     noteCopy:
-      "Coordinator builds the month, worker requests changes, approver validates the roster and reviews evidence.",
+      "Manager builds the month, worker requests changes, and manager review closes the loop.",
   },
-  coordinator: {
-    kicker: "Coordinator workspace",
+  manager: {
+    kicker: "Manager workspace",
     title: "Build and prepare the monthly roster",
     copy: "Set up the department, register staff, create the month, assign shifts, and send the period for review.",
-    noteTitle: "Coordinator goal",
-    noteCopy: "You are responsible for assembling the roster and moving the month from draft to review.",
+    noteTitle: "Manager goal",
+    noteCopy: "You are responsible for assembling the roster, reviewing exceptions, and closing the monthly workflow.",
   },
   worker: {
     kicker: "Worker workspace",
@@ -98,13 +98,6 @@ const roleMeta = {
     copy: "You only see your own assignments. Use this view to spot issues and submit a swap, replacement, or incident.",
     noteTitle: "Worker goal",
     noteCopy: "Read the roster clearly, then send a request linked to a real assignment when something needs to change.",
-  },
-  approver: {
-    kicker: "Approver workspace",
-    title: "Validate the month and the pending requests",
-    copy: "Review periods and worker requests, then confirm or reject them with a tracked decision.",
-    noteTitle: "Approver goal",
-    noteCopy: "You are the control layer: approve what is ready, reject what is incomplete, and inspect the audit trail.",
   },
 };
 
@@ -149,7 +142,7 @@ function humanizeErrorMessage(message) {
     "attendance enrollment already exists for worker":
       "That worker is already enrolled for attendance.",
     "worker must have an active attendance enrollment":
-      "This worker is not enrolled for attendance yet. Ask the coordinator to create the enrollment first.",
+      "This worker is not enrolled for attendance yet. Ask the manager to create the enrollment first.",
   };
   return known[value] || value;
 }
@@ -235,17 +228,19 @@ function syncSessionUI() {
 
   if (!session) {
     Object.values(els.views).forEach((node) => node.classList.remove("active"));
+    els.managerReviewView.classList.remove("active");
     els.navLinks.forEach((link) => {
       link.hidden = true;
       link.classList.remove("active");
     });
     els.workerSummary.textContent = "Log in as a worker to load your linked roster identity.";
-    els.approverSummary.textContent =
+    els.managerReviewSummary.textContent =
       "Pending decisions appear in the review queue. Audit events explain what changed and who did it.";
     return;
   }
 
   Object.entries(els.views).forEach(([key, node]) => node.classList.toggle("active", key === session.role));
+  els.managerReviewView.classList.toggle("active", session.role === "manager");
   els.navLinks.forEach((link) => {
     const active = link.dataset.view === session.role;
     link.hidden = !active;
@@ -258,8 +253,8 @@ function syncSessionUI() {
       : `${session.full_name} is not linked to a worker record yet.`;
   }
 
-  if (session.role === "approver") {
-    els.approverSummary.textContent =
+  if (session.role === "manager") {
+    els.managerReviewSummary.textContent =
       "Use the review queue for decisions. Use the audit trail to inspect the evidence behind those changes.";
   }
 }
@@ -604,7 +599,7 @@ async function hydrateSession() {
   syncSessionUI();
 }
 
-async function refreshCoordinatorData() {
+async function refreshManagerData() {
   const [departments, workers, periods, attendanceEnrollments] = await Promise.all([
     api("/scheduling/departments"),
     api("/scheduling/workers"),
@@ -653,7 +648,7 @@ async function refreshWorkerData() {
   els.workerSummary.textContent = `${state.session.full_name} has ${assignments.items.length} assignments and ${requests.items.length} submitted requests in this demo session.`;
 }
 
-async function refreshApproverData() {
+async function refreshManagerReviewData() {
   const [queue, audit, attendanceAttempts] = await Promise.all([
     api("/scheduling/review-queue"),
     api("/scheduling/audit-events"),
@@ -663,17 +658,15 @@ async function refreshApproverData() {
   renderReviewQueue(queue);
   renderAudit(audit);
   const pendingCount = queue.schedule_periods.length + queue.change_requests.length + attendanceAttempts.length;
-  els.approverSummary.textContent = `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for a decision. Audit trail shows the current evidence.`;
+  els.managerReviewSummary.textContent = `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for a decision. Audit trail shows the current evidence.`;
 }
 
 async function refreshCurrentView() {
   if (!state.session) return;
-  if (state.session.role === "coordinator") {
-    await refreshCoordinatorData();
+  if (state.session.role === "manager") {
+    await Promise.all([refreshManagerData(), refreshManagerReviewData()]);
   } else if (state.session.role === "worker") {
     await refreshWorkerData();
-  } else if (state.session.role === "approver") {
-    await refreshApproverData();
   }
 }
 
@@ -718,7 +711,7 @@ async function logout() {
   state.periods = [];
   state.selectedPeriodId = "";
 
-  renderEmpty(els.periodList, "Log in to load coordinator data.");
+  renderEmpty(els.periodList, "Log in to load manager data.");
   renderEmpty(els.calendarList, "Log in to load calendar data.");
   renderEmpty(els.attendanceEnrollmentList, "Log in to load attendance enrollments.");
   renderEmpty(els.workerAssignmentList, "Log in to load worker data.");
@@ -750,11 +743,11 @@ els.departmentForm.addEventListener("submit", async (event) => {
       }),
     });
     event.currentTarget.reset();
-    await refreshCoordinatorData();
+    await refreshManagerData();
     showFlash("Department created.");
   } catch (error) {
     if (String(error.message).includes("Department code already exists")) {
-      await refreshCoordinatorData().catch(() => {});
+      await refreshManagerData().catch(() => {});
       const codes = state.departments.map((item) => `${item.name} (${item.code})`).join(", ");
       showFlash(`Department code already exists. Current departments: ${codes || "none"}.`, "error");
       return;
@@ -778,7 +771,7 @@ els.workerForm.addEventListener("submit", async (event) => {
       }),
     });
     event.currentTarget.reset();
-    await refreshCoordinatorData();
+    await refreshManagerData();
     showFlash("Worker created.");
   } catch (error) {
     showFlash(error.message, "error");
@@ -798,7 +791,7 @@ els.periodForm.addEventListener("submit", async (event) => {
         department_id: form.get("department_id"),
       }),
     });
-    await refreshCoordinatorData();
+    await refreshManagerData();
     showFlash("Schedule period created.");
   } catch (error) {
     showFlash(error.message, "error");
@@ -823,7 +816,7 @@ els.assignmentForm.addEventListener("submit", async (event) => {
       }),
     });
     event.currentTarget.reset();
-    await refreshCoordinatorData();
+    await refreshManagerData();
     if (periodId) await loadCalendar(periodId);
     showFlash("Assignment created.");
   } catch (error) {
@@ -841,7 +834,7 @@ els.attendanceEnrollmentForm.addEventListener("submit", async (event) => {
         worker_id: els.attendanceEnrollmentWorkerSelect.value,
       }),
     });
-    await refreshCoordinatorData();
+    await refreshManagerData();
     showFlash("Attendance enrollment created.");
   } catch (error) {
     showFlash(error.message, "error");
@@ -851,8 +844,8 @@ els.attendanceEnrollmentForm.addEventListener("submit", async (event) => {
 els.refreshPeriods.addEventListener("click", async () => {
   clearFlash();
   try {
-    await refreshCoordinatorData();
-    showFlash("Coordinator data refreshed.");
+    await refreshManagerData();
+    showFlash("Manager data refreshed.");
   } catch (error) {
     showFlash(error.message, "error");
   }
@@ -878,7 +871,7 @@ els.sendReview.addEventListener("click", async () => {
       method: "PATCH",
       body: JSON.stringify({ status: "in_review" }),
     });
-    await refreshCoordinatorData();
+    await refreshManagerData();
     await loadCalendar(state.selectedPeriodId);
     showFlash("Period sent to review.");
   } catch (error) {
@@ -955,7 +948,7 @@ els.attendanceAttemptForm.addEventListener("submit", async (event) => {
 els.refreshQueue.addEventListener("click", async () => {
   clearFlash();
   try {
-    await refreshApproverData();
+    await refreshManagerReviewData();
     showFlash("Review queue refreshed.");
   } catch (error) {
     showFlash(error.message, "error");
@@ -986,7 +979,7 @@ els.reviewQueue.addEventListener("click", async (event) => {
         }),
       });
     }
-    await refreshApproverData();
+    await refreshManagerReviewData();
     showFlash(`Decision recorded: ${button.dataset.decision}.`);
   } catch (error) {
     showFlash(error.message, "error");
@@ -1005,7 +998,7 @@ els.refreshAudit.addEventListener("click", async () => {
 });
 
 async function init() {
-  renderEmpty(els.periodList, "Log in to load coordinator data.");
+  renderEmpty(els.periodList, "Log in to load manager data.");
   renderEmpty(els.calendarList, "Log in to load calendar data.");
   renderEmpty(els.attendanceEnrollmentList, "Log in to load attendance enrollments.");
   renderEmpty(els.workerAssignmentList, "Log in to load worker data.");

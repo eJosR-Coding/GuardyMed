@@ -1,13 +1,13 @@
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import build_coordinator_flow, login, seed_and_login
+from tests.conftest import build_manager_flow, login, seed_and_login
 
 
 @pytest.mark.anyio
-async def test_coordinator_can_create_attendance_enrollment_for_worker(client: AsyncClient) -> None:
-    await seed_and_login(client, "coord@guardymed.local")
-    ids = await build_coordinator_flow(client)
+async def test_manager_can_create_attendance_enrollment_for_worker(client: AsyncClient) -> None:
+    await seed_and_login(client, "manager@guardymed.local")
+    ids = await build_manager_flow(client)
 
     response = await client.post(
         "/api/v1/scheduling/attendance/enrollments",
@@ -21,7 +21,7 @@ async def test_coordinator_can_create_attendance_enrollment_for_worker(client: A
 
 @pytest.mark.anyio
 async def test_worker_can_submit_attendance_for_own_assignment(client: AsyncClient) -> None:
-    await seed_and_login(client, "coord@guardymed.local")
+    await seed_and_login(client, "manager@guardymed.local")
     await client.post("/api/v1/auth/logout")
 
     session = await login(client, "worker@guardymed.local")
@@ -48,8 +48,8 @@ async def test_worker_can_submit_attendance_for_own_assignment(client: AsyncClie
 
 @pytest.mark.anyio
 async def test_worker_cannot_submit_attendance_for_someone_elses_assignment(client: AsyncClient) -> None:
-    await seed_and_login(client, "coord@guardymed.local")
-    ids = await build_coordinator_flow(client)
+    await seed_and_login(client, "manager@guardymed.local")
+    ids = await build_manager_flow(client)
     await client.post("/api/v1/auth/logout")
 
     session = await login(client, "worker@guardymed.local")
@@ -69,8 +69,8 @@ async def test_worker_cannot_submit_attendance_for_someone_elses_assignment(clie
 
 
 @pytest.mark.anyio
-async def test_approver_can_review_pending_attendance_attempt(client: AsyncClient) -> None:
-    await seed_and_login(client, "coord@guardymed.local")
+async def test_manager_can_review_pending_attendance_attempt(client: AsyncClient) -> None:
+    await seed_and_login(client, "manager@guardymed.local")
     await client.post("/api/v1/auth/logout")
 
     worker_session = await login(client, "worker@guardymed.local")
@@ -88,7 +88,7 @@ async def test_approver_can_review_pending_attendance_attempt(client: AsyncClien
     attempt_id = created.json()["id"]
     await client.post("/api/v1/auth/logout")
 
-    await login(client, "approver@guardymed.local")
+    await login(client, "manager@guardymed.local")
     queue = await client.get("/api/v1/scheduling/attendance/review-queue")
     assert queue.status_code == 200, queue.text
     assert any(item["id"] == attempt_id for item in queue.json())

@@ -2,7 +2,7 @@
 
 ## Overview
 
-GuardyMed is a healthcare operations platform focused on monthly shift scheduling, approval workflows, auditability, and operational exports.
+GuardyMed is a healthcare workforce operations MVP focused on monthly shift scheduling, worker self-service flows, approval workflows, attendance scaffolding, auditability, and operational exports.
 
 ## Problem Context
 
@@ -17,6 +17,8 @@ That creates predictable operational problems:
 
 GuardyMed is being designed to reduce that operational fragmentation with a clearer scheduling core and an auditable workflow.
 
+For portfolio purposes, the project is framed as a system-design-heavy healthcare product rather than a startup pitch or a generic admin dashboard.
+
 ## Current Scope
 
 The current repository scope is intentionally narrow.
@@ -25,7 +27,7 @@ It currently includes:
 
 - a FastAPI backend scaffold
 - a mounted browser MVP under `/app`
-- session-based workflows for coordinator, worker, and approver
+- session-based workflows for manager and worker
 - scheduling, change request, approval, audit, export, and attendance scaffold endpoints
 - an initial Phase A system definition and architecture direction
 
@@ -38,10 +40,16 @@ GuardyMed currently solves the operational core first:
 - enroll workers for attendance
 - let workers submit manual attendance attempts
 - let workers submit change requests
-- let approvers review queue items
-- let approvers review attendance attempts
+- let managers review queue items
+- let managers review attendance attempts
 - preserve audit events
 - generate monthly exports
+
+The current product story is:
+
+- manager builds the month
+- worker reacts to assigned work
+- manager reviews and closes the loop
 
 ## Architecture
 
@@ -54,6 +62,8 @@ Current implementation is a modular monolith:
 
 This keeps Phase A simple while preserving clear boundaries for later AI and CV modules.
 
+The next planned AI boundary is face-recognition attendance only. The current MVP does not implement CV yet; it prepares the workflow and data boundaries for that future module.
+
 ## C4 Diagrams
 
 ## Deployment
@@ -63,6 +73,12 @@ Local development runs as a single FastAPI process.
 - API docs: `/docs`
 - mounted app: `/app`
 - health check: `/health`
+
+## Demo Accounts
+
+- manager: `manager@guardymed.local`
+- worker: `worker@guardymed.local`
+- password: `password123`
 
 ## Tech Stack
 
@@ -99,9 +115,8 @@ Auth model for the current MVP:
 
 Supported roles:
 
-- `coordinator`
+- `manager`
 - `worker`
-- `approver`
 
 Implemented endpoints:
 
@@ -146,6 +161,25 @@ Quick local run:
 - `uv run uvicorn apps.api.app.main:app --reload`
 - open `http://127.0.0.1:8000/app`
 - load demo data from the session panel or call `POST /api/v1/auth/bootstrap-demo`
+
+## Core Workflows
+
+1. Manager creates a department, workers, a monthly schedule period, and assignments.
+2. Manager enrolls a worker for attendance.
+3. Worker views only their own assignments, then submits a change request or attendance attempt.
+4. Manager reviews schedule items, worker requests, and attendance attempts.
+5. Audit events and exports reflect the resulting operational state.
+
+## Internal Docs
+
+Useful internal references:
+
+- architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- face-recognition attendance design: [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md)
+- portfolio framing: [docs/PORTFOLIO_DIRECTION.md](docs/PORTFOLIO_DIRECTION.md)
+- demo walkthrough: [docs/DEMO_FLOW.md](docs/DEMO_FLOW.md)
+- portfolio research: [docs/RESEARCH.md](docs/RESEARCH.md)
+- internal decisions: [docs/DECISIONS.md](docs/DECISIONS.md)
 
 ## Repository Structure
 

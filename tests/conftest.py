@@ -50,7 +50,7 @@ async def seed_and_login(client: AsyncClient, email: str) -> dict:
     return await login(client, email)
 
 
-async def build_coordinator_flow(client: AsyncClient) -> dict[str, str]:
+async def build_manager_flow(client: AsyncClient) -> dict[str, str]:
     department = await client.post(
         "/api/v1/scheduling/departments",
         json={"name": "Pediatrics", "code": "PED"},

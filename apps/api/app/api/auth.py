@@ -16,9 +16,8 @@ from apps.api.app.domain.scheduling.bootstrap import session_factory
 
 
 class UserRole(StrEnum):
-    COORDINATOR = "coordinator"
+    MANAGER = "manager"
     WORKER = "worker"
-    APPROVER = "approver"
 
 
 @dataclass(slots=True)

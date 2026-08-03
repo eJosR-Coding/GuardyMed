@@ -35,7 +35,7 @@ def test_sqlalchemy_repository_persists_phase_a_flow(tmp_path) -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     assignment = service.create_assignment(
         period_id=period.id,
@@ -58,7 +58,7 @@ def test_sqlalchemy_repository_persists_phase_a_flow(tmp_path) -> None:
         target_type=ApprovalTargetType.SCHEDULE_PERIOD,
         target_id=period.id,
         decision=ApprovalDecisionType.APPROVED,
-        decided_by="approver_1",
+        decided_by="manager_1",
         comment="approved",
     )
     export_job = service.create_export(

@@ -34,6 +34,6 @@ async def test_web_static_assets_exist_and_contain_expected_ui_markers(client: A
     assert '"/scheduling/departments"' in script
 
     assert "GuardyMed" in index
-    assert "Coordinator workflow" in index
+    assert "Manager planning workflow" in index
     assert "Worker workflow" in index
-    assert "Approver workflow" in index
+    assert "Manager review workflow" in index

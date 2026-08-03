@@ -71,20 +71,13 @@ async def bootstrap_demo() -> DemoBootstrapRead:
     workers = scheduling_service.list_workers()
     department_id = workers[0].department_id if workers else None
     worker_map = {worker.full_name: worker for worker in workers}
-    created_before = get_user_by_email("coord@guardymed.local") is not None
+    created_before = get_user_by_email("manager@guardymed.local") is not None
 
     create_user(
-        email="coord@guardymed.local",
-        full_name="Demo Coordinator",
+        email="manager@guardymed.local",
+        full_name="Demo Manager",
         password="password123",
-        role=UserRole.COORDINATOR,
-        department_id=department_id,
-    )
-    create_user(
-        email="approver@guardymed.local",
-        full_name="Demo Approver",
-        password="password123",
-        role=UserRole.APPROVER,
+        role=UserRole.MANAGER,
         department_id=department_id,
     )
     worker = _pick_worker(worker_map)
@@ -100,9 +93,8 @@ async def bootstrap_demo() -> DemoBootstrapRead:
     return DemoBootstrapRead(
         seeded=seed_result["seeded"] or not created_before,
         credentials=[
-            {"email": "coord@guardymed.local", "password": "password123", "role": "coordinator"},
+            {"email": "manager@guardymed.local", "password": "password123", "role": "manager"},
             {"email": "worker@guardymed.local", "password": "password123", "role": "worker"},
-            {"email": "approver@guardymed.local", "password": "password123", "role": "approver"},
         ],
     )
 
@@ -140,12 +132,11 @@ async def get_session(
 
 @router.get("/users", response_model=list[SessionRead])
 async def list_demo_users(
-    _: AuthContext = Depends(require_roles(UserRole.COORDINATOR, UserRole.APPROVER)),
+    _: AuthContext = Depends(require_roles(UserRole.MANAGER)),
 ) -> list[SessionRead]:
     demo_users = [
-        get_user_by_email("coord@guardymed.local"),
+        get_user_by_email("manager@guardymed.local"),
         get_user_by_email("worker@guardymed.local"),
-        get_user_by_email("approver@guardymed.local"),
     ]
     return [SessionRead.model_validate(asdict(build_auth_context(user))) for user in demo_users if user is not None]
 

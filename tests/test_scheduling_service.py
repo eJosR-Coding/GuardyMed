@@ -31,7 +31,7 @@ def test_create_schedule_period_flow() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
 
     assignment = service.create_assignment(
@@ -124,7 +124,7 @@ def test_create_and_cancel_change_request() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     assignment = service.create_assignment(
         period_id=period.id,
@@ -167,7 +167,7 @@ def test_change_request_rejects_invalid_transition() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     assignment = service.create_assignment(
         period_id=period.id,
@@ -210,7 +210,7 @@ def test_approve_schedule_period_from_review_queue() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     service.update_period_status(period.id, status_value=SchedulePeriodStatus.IN_REVIEW)
 
@@ -221,7 +221,7 @@ def test_approve_schedule_period_from_review_queue() -> None:
         target_type=ApprovalTargetType.SCHEDULE_PERIOD,
         target_id=period.id,
         decision=ApprovalDecisionType.APPROVED,
-        decided_by="approver_1",
+        decided_by="manager_1",
         comment="approved",
     )
 
@@ -247,7 +247,7 @@ def test_reject_change_request_via_approval_decision() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     assignment = service.create_assignment(
         period_id=period.id,
@@ -270,7 +270,7 @@ def test_reject_change_request_via_approval_decision() -> None:
         target_type=ApprovalTargetType.CHANGE_REQUEST,
         target_id=change_request.id,
         decision=ApprovalDecisionType.REJECTED,
-        decided_by="approver_1",
+        decided_by="manager_1",
         comment="not possible",
     )
     updated_request = service.get_change_request(change_request.id)
@@ -287,7 +287,7 @@ def test_reject_schedule_period_returns_to_draft() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     service.update_period_status(period.id, status_value=SchedulePeriodStatus.IN_REVIEW)
 
@@ -295,7 +295,7 @@ def test_reject_schedule_period_returns_to_draft() -> None:
         target_type=ApprovalTargetType.SCHEDULE_PERIOD,
         target_id=period.id,
         decision=ApprovalDecisionType.REJECTED,
-        decided_by="approver_1",
+        decided_by="manager_1",
         comment="needs changes",
     )
 
@@ -317,7 +317,7 @@ def test_audit_events_are_recorded_for_core_flow() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     assignment = service.create_assignment(
         period_id=period.id,
@@ -353,14 +353,14 @@ def test_audit_events_capture_approval_side_effects() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     service.update_period_status(period.id, status_value=SchedulePeriodStatus.IN_REVIEW)
     decision = service.create_approval_decision(
         target_type=ApprovalTargetType.SCHEDULE_PERIOD,
         target_id=period.id,
         decision=ApprovalDecisionType.APPROVED,
-        decided_by="approver_1",
+        decided_by="manager_1",
         comment="approved",
     )
 
@@ -385,7 +385,7 @@ def test_create_and_fetch_export_for_approved_period() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
     service.create_assignment(
         period_id=period.id,
@@ -401,7 +401,7 @@ def test_create_and_fetch_export_for_approved_period() -> None:
         target_type=ApprovalTargetType.SCHEDULE_PERIOD,
         target_id=period.id,
         decision=ApprovalDecisionType.APPROVED,
-        decided_by="approver_1",
+        decided_by="manager_1",
         comment="approved",
     )
 
@@ -455,7 +455,7 @@ def test_export_requires_approved_period() -> None:
         year=2026,
         month=8,
         department_id=department.id,
-        created_by="coordinator_1",
+        created_by="manager_1",
     )
 
     try:

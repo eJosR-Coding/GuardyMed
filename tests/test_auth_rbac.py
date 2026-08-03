@@ -15,10 +15,10 @@ from apps.api.app.main import app
 
 def ensure_demo_user():
     return create_user(
-        email="coord@guardymed.local",
-        full_name="Demo Coordinator",
+        email="manager@guardymed.local",
+        full_name="Demo Manager",
         password="password123",
-        role=UserRole.COORDINATOR,
+        role=UserRole.MANAGER,
         department_id="dep_demo",
     )
 
@@ -32,11 +32,11 @@ def test_password_hash_and_verify() -> None:
 
 def test_create_and_fetch_user() -> None:
     user = ensure_demo_user()
-    fetched = get_user_by_email("coord@guardymed.local")
+    fetched = get_user_by_email("manager@guardymed.local")
 
     assert fetched is not None
     assert fetched.id == user.id
-    assert fetched.role == UserRole.COORDINATOR
+    assert fetched.role == UserRole.MANAGER
 
 
 def test_create_user_updates_existing_demo_links() -> None:
@@ -74,8 +74,8 @@ def test_session_context_resolves_from_session_id() -> None:
     auth = resolve_auth_context(session_id=session_id)
 
     assert auth.user_id == user.id
-    assert auth.email == "coord@guardymed.local"
-    assert auth.role == UserRole.COORDINATOR
+    assert auth.email == "manager@guardymed.local"
+    assert auth.role == UserRole.MANAGER
 
 
 def test_missing_session_is_rejected() -> None:
