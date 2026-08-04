@@ -59,6 +59,10 @@ button {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  min-height: 100vh;
 }
 
 .content {
@@ -184,6 +188,41 @@ button {
 
 .section-heading.with-margin {
   margin-top: 18px;
+}
+
+.workspace-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+}
+
+.workspace-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), color-mix(in oklab, var(--surface) 88%, white));
+}
+
+.workspace-card strong {
+  display: block;
+  margin: 0 0 6px;
+}
+
+.workspace-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.workspace-label {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary) 8%, white);
+  color: var(--primary-strong);
+  font-size: 0.76rem;
 }
 
 .overview-panel {
@@ -431,6 +470,30 @@ button:focus {
   font-size: 0.88rem;
 }
 
+.meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--line);
+}
+
+.evidence-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--info) 24%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--info) 7%, white);
+}
+
+.evidence-title {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+  color: var(--primary-strong);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -570,11 +633,14 @@ pre {
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    position: static;
+    min-height: auto;
   }
 
   .hero,
   .grid.two,
   .overview-panel,
+  .workspace-strip,
   .workflow-strip,
   .row.two-up,
   .row.three-up {

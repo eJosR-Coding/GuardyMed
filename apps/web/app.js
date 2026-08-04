@@ -241,6 +241,24 @@ function renderEmpty(target, message) {
   target.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
 }
 
+function renderMeta(values) {
+  return `<div class="meta">${values.map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</div>`;
+}
+
+function renderMatchEvidence(matchResult) {
+  if (!matchResult) return "";
+  return `
+    <div class="evidence-panel">
+      <strong class="evidence-title">CV evidence</strong>
+      ${renderMeta([
+        `Route: ${matchResult.route}`,
+        `Score: ${Number(matchResult.similarity_score).toFixed(4)}`,
+        matchResult.detector_name,
+      ])}
+    </div>
+  `;
+}
+
 function setCaptureStatus(message, kind = "muted") {
   els.attendanceCaptureStatus.className = `summary-banner summary-banner-${kind}`;
   els.attendanceCaptureStatus.textContent = message;
@@ -472,10 +490,7 @@ function renderPeriods() {
           <div class="item-header">
             <div>
               <h4 class="item-title">${periodLabel(period)}</h4>
-              <div class="meta">
-                <span>${escapeHtml(period.department_id)}</span>
-                <span>${escapeHtml(period.created_by || "system")}</span>
-              </div>
+              ${renderMeta([period.department_id, period.created_by || "system"])}
             </div>
             <span class="${badgeClass(period.status)}">${escapeHtml(period.status)}</span>
           </div>
@@ -511,11 +526,7 @@ function renderCalendar(calendar) {
           <div class="item-header">
             <div>
               <h4 class="item-title">${escapeHtml(worker?.full_name || assignment.worker_id)}</h4>
-              <div class="meta">
-                <span>${assignment.shift_date}</span>
-                <span>${assignment.start_time} to ${assignment.end_time}</span>
-                <span>${escapeHtml(assignment.assignment_type)}</span>
-              </div>
+              ${renderMeta([assignment.shift_date, `${assignment.start_time} to ${assignment.end_time}`, assignment.assignment_type])}
             </div>
           </div>
           ${assignment.notes ? `<p class="muted">${escapeHtml(assignment.notes)}</p>` : ""}
@@ -534,10 +545,7 @@ function renderExports(items) {
               <div class="item-header">
                 <div>
                   <h4 class="item-title">${escapeHtml(item.export_type)}</h4>
-                  <div class="meta">
-                    <span>${new Date(item.created_at).toLocaleString()}</span>
-                    <span>${escapeHtml(item.created_by)}</span>
-                  </div>
+                  ${renderMeta([new Date(item.created_at).toLocaleString(), item.created_by])}
                 </div>
               </div>
               <pre>${escapeHtml(item.content)}</pre>
@@ -568,10 +576,7 @@ function renderWorkerAssignments(items) {
           <div class="item-header">
             <div>
               <h4 class="item-title">${assignment.shift_date}</h4>
-              <div class="meta">
-                <span>${assignment.start_time} to ${assignment.end_time}</span>
-                <span>${escapeHtml(assignment.assignment_type)}</span>
-              </div>
+              ${renderMeta([`${assignment.start_time} to ${assignment.end_time}`, assignment.assignment_type])}
             </div>
           </div>
           ${assignment.notes ? `<p class="muted">${escapeHtml(assignment.notes)}</p>` : ""}
@@ -594,10 +599,7 @@ function renderWorkerRequests(items) {
           <div class="item-header">
             <div>
               <h4 class="item-title">${escapeHtml(item.request_type)}</h4>
-              <div class="meta">
-                <span>${escapeHtml(item.assignment_id)}</span>
-                <span>${escapeHtml(item.requested_by)}</span>
-              </div>
+              ${renderMeta([item.assignment_id, item.requested_by])}
             </div>
             <span class="${badgeClass(item.status)}">${escapeHtml(item.status)}</span>
           </div>
@@ -623,10 +625,7 @@ function renderAttendanceEnrollments(items) {
           <div class="item-header">
             <div>
               <h4 class="item-title">${escapeHtml(worker?.full_name || item.worker_id)}</h4>
-              <div class="meta">
-                <span>${escapeHtml(item.worker_id)}</span>
-                <span>${escapeHtml(item.created_by)}</span>
-              </div>
+              ${renderMeta([item.worker_id, item.created_by])}
             </div>
             <span class="${badgeClass(item.status)}">${escapeHtml(item.status)}</span>
           </div>
@@ -650,25 +649,12 @@ function renderAttendanceAttempts(items, { workerScoped = false } = {}) {
           <div class="item-header">
             <div>
               <h4 class="item-title">${escapeHtml(item.attempt_type)}</h4>
-              <div class="meta">
-                <span>${escapeHtml(item.assignment_id)}</span>
-                <span>${new Date(item.attempted_at).toLocaleString()}</span>
-              </div>
+              ${renderMeta([item.assignment_id, new Date(item.attempted_at).toLocaleString()])}
             </div>
             <span class="${badgeClass(item.decision_status)}">${escapeHtml(item.decision_status)}</span>
           </div>
           ${item.evidence_ref ? `<p>${escapeHtml(item.evidence_ref)}</p>` : ""}
-          ${
-            matchResult
-              ? `
-                <div class="meta">
-                  <span>Route: ${escapeHtml(matchResult.route)}</span>
-                  <span>Score: ${Number(matchResult.similarity_score).toFixed(4)}</span>
-                  <span>${escapeHtml(matchResult.detector_name)}</span>
-                </div>
-              `
-              : ""
-          }
+          ${renderMatchEvidence(matchResult)}
           ${item.review_reason ? `<p class="muted">${escapeHtml(item.review_reason)}</p>` : ""}
         </article>
       `;
@@ -717,22 +703,12 @@ function renderReviewQueue(data) {
           <div class="item-header">
             <div>
               <h4 class="item-title">${escapeHtml(item.title)}</h4>
-              <div class="meta">${item.meta.map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</div>
+              ${renderMeta(item.meta)}
             </div>
             <span class="${badgeClass(item.status)}">${escapeHtml(item.status)}</span>
           </div>
           ${item.reason ? `<p>${escapeHtml(item.reason)}</p>` : ""}
-          ${
-            item.matchResult
-              ? `
-                <div class="meta">
-                  <span>Route: ${escapeHtml(item.matchResult.route)}</span>
-                  <span>Score: ${Number(item.matchResult.similarity_score).toFixed(4)}</span>
-                  <span>${escapeHtml(item.matchResult.detector_name)}</span>
-                </div>
-              `
-              : ""
-          }
+          ${renderMatchEvidence(item.matchResult)}
           <div class="actions">
             <button class="primary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="approved" type="button">Approve</button>
             <button class="secondary" data-action="decision" data-target-type="${item.type}" data-target-id="${item.id}" data-decision="rejected" type="button">Reject</button>
@@ -775,11 +751,7 @@ function renderAudit(items) {
           <div class="item-header">
             <div>
               <h4 class="item-title">${escapeHtml(item.action)}</h4>
-              <div class="meta">
-                <span>${escapeHtml(item.entity_type)}</span>
-                <span>${escapeHtml(item.entity_id)}</span>
-                <span>${escapeHtml(item.actor_id)}</span>
-              </div>
+              ${renderMeta([item.entity_type, item.entity_id, item.actor_id])}
             </div>
           </div>
           <pre>${escapeHtml(JSON.stringify(item.payload, null, 2))}</pre>
