@@ -242,7 +242,7 @@ const vm = props.vm;
                 <span>Worker</span>
                 <select v-model="vm.state.forms.attendanceEnrollment.worker_id" required>
                   <option value="">Select worker</option>
-                  <option v-for="worker in vm.state.workers" :key="worker.id" :value="worker.id">
+                  <option v-for="worker in vm.availableAttendanceEnrollmentWorkers.value" :key="worker.id" :value="worker.id">
                     {{ worker.full_name }} · {{ worker.worker_type }}
                   </option>
                 </select>
@@ -257,7 +257,7 @@ const vm = props.vm;
                 <span>Worker</span>
                 <select v-model="vm.state.forms.faceEnrollment.worker_id" required>
                   <option value="">Select worker</option>
-                  <option v-for="worker in vm.state.workers" :key="worker.id" :value="worker.id">
+                  <option v-for="worker in vm.availableFaceEnrollmentWorkers.value" :key="worker.id" :value="worker.id">
                     {{ worker.full_name }} · {{ worker.worker_type }}
                   </option>
                 </select>

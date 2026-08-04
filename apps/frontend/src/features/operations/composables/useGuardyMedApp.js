@@ -99,6 +99,13 @@ export function useGuardyMedApp() {
   const departmentMap = computed(() => Object.fromEntries(state.departments.map((item) => [item.id, item])));
   const userMap = computed(() => Object.fromEntries(state.users.map((item) => [item.user_id, item])));
   const workerMap = computed(() => Object.fromEntries(state.workers.map((item) => [item.id, item])));
+  const enrolledWorkerIds = computed(() => new Set(state.attendanceEnrollments.map((item) => item.worker_id)));
+  const availableAttendanceEnrollmentWorkers = computed(() =>
+    state.workers.filter((worker) => !enrolledWorkerIds.value.has(worker.id)),
+  );
+  const availableFaceEnrollmentWorkers = computed(() =>
+    state.workers.filter((worker) => enrolledWorkerIds.value.has(worker.id)),
+  );
 
   function showFlash(message, kind = "success") {
     state.flash.visible = true;
@@ -162,6 +169,18 @@ export function useGuardyMedApp() {
       .filter(Boolean)
       .map((part) => part[0].toUpperCase() + part.slice(1))
       .join(" ");
+  }
+
+  function syncAttendanceSelections() {
+    const enrollmentWorkers = availableAttendanceEnrollmentWorkers.value;
+    const faceWorkers = availableFaceEnrollmentWorkers.value;
+
+    if (!enrollmentWorkers.some((worker) => worker.id === state.forms.attendanceEnrollment.worker_id)) {
+      state.forms.attendanceEnrollment.worker_id = enrollmentWorkers[0]?.id || "";
+    }
+    if (!faceWorkers.some((worker) => worker.id === state.forms.faceEnrollment.worker_id)) {
+      state.forms.faceEnrollment.worker_id = faceWorkers[0]?.id || "";
+    }
   }
 
   function requestTypeLabel(value) {
@@ -386,8 +405,7 @@ export function useGuardyMedApp() {
     if (!state.forms.period.department_id && departments[0]) state.forms.period.department_id = departments[0].id;
     if (!state.forms.assignment.period_id && state.periods[0]) state.forms.assignment.period_id = state.periods[0].id;
     syncAssignmentWorkerSelection();
-    if (!state.forms.attendanceEnrollment.worker_id && state.workers[0]) state.forms.attendanceEnrollment.worker_id = state.workers[0].id;
-    if (!state.forms.faceEnrollment.worker_id && state.workers[0]) state.forms.faceEnrollment.worker_id = state.workers[0].id;
+    syncAttendanceSelections();
   }
 
   async function refreshWorkerData() {
@@ -508,12 +526,18 @@ export function useGuardyMedApp() {
   }
 
   async function submitAttendanceEnrollment() {
-    await api("/scheduling/attendance/enrollments", {
-      method: "POST",
-      body: JSON.stringify({ worker_id: state.forms.attendanceEnrollment.worker_id }),
-    });
-    await refreshManagerData();
-    showFlash("Attendance enrollment created.");
+    clearFlash();
+    try {
+      await api("/scheduling/attendance/enrollments", {
+        method: "POST",
+        body: JSON.stringify({ worker_id: state.forms.attendanceEnrollment.worker_id }),
+      });
+      await refreshManagerData();
+      showFlash("Attendance enrollment created.");
+    } catch (error) {
+      syncAttendanceSelections();
+      showFlash(String(error?.message || "Could not create attendance enrollment."), "error");
+    }
   }
 
   function onFaceEnrollmentFileChange(event) {
@@ -521,18 +545,23 @@ export function useGuardyMedApp() {
   }
 
   async function submitFaceEnrollment() {
-    if (!state.forms.faceEnrollment.file) throw new Error("Select a face image first.");
-    const dataUrl = await fileToDataUrl(state.forms.faceEnrollment.file);
-    const result = await api("/scheduling/attendance/cv/enrollments", {
-      method: "POST",
-      body: JSON.stringify({
-        worker_id: state.forms.faceEnrollment.worker_id,
-        media_base64: dataUrl.split(",", 2)[1] || "",
-      }),
-    });
-    state.forms.faceEnrollment.file = null;
-    state.faceEnrollmentSummary = `Face enrollment created for ${result.enrollment.worker_id} with ${result.template.detector_name}.`;
-    showFlash("Face enrollment created.");
+    clearFlash();
+    try {
+      if (!state.forms.faceEnrollment.file) throw new Error("Select a face image first.");
+      const dataUrl = await fileToDataUrl(state.forms.faceEnrollment.file);
+      const result = await api("/scheduling/attendance/cv/enrollments", {
+        method: "POST",
+        body: JSON.stringify({
+          worker_id: state.forms.faceEnrollment.worker_id,
+          media_base64: dataUrl.split(",", 2)[1] || "",
+        }),
+      });
+      state.forms.faceEnrollment.file = null;
+      state.faceEnrollmentSummary = `Face enrollment created for ${result.enrollment.worker_id} with ${result.template.detector_name}.`;
+      showFlash("Face enrollment created.");
+    } catch (error) {
+      showFlash(String(error?.message || "Could not create face enrollment."), "error");
+    }
   }
 
   async function submitAttendanceAttempt() {
@@ -667,6 +696,8 @@ export function useGuardyMedApp() {
     auditActionLabel,
     auditPayloadText,
     auditPayloadEntries,
+    availableAttendanceEnrollmentWorkers,
+    availableFaceEnrollmentWorkers,
     availableAssignmentWorkers,
     reviewItems,
     managerSections,
