@@ -26,7 +26,8 @@ The current repository scope is intentionally narrow.
 It currently includes:
 
 - a FastAPI backend scaffold
-- a mounted browser MVP under `/app`
+- a Vue + Vite frontend source app under `apps/frontend`
+- a production build served by FastAPI under `/app`
 - session-based workflows for manager and worker
 - scheduling, change request, approval, audit, export, and attendance scaffold endpoints
 - a basic browser face-enrollment and face-verification flow for the worker attendance demo
@@ -57,7 +58,7 @@ The current product story is:
 Current implementation is a modular monolith:
 
 - one FastAPI app
-- one mounted browser UI at `/app`
+- one Vue frontend built into `apps/web` and mounted at `/app`
 - one scheduling domain module
 - one persistence path through SQLAlchemy
 
@@ -182,8 +183,8 @@ Local development runs as a single FastAPI process.
 - FastAPI
 - SQLAlchemy
 - SQLite by default for local development
-- vanilla HTML, CSS, and JavaScript for the mounted MVP UI
-- Alpine.js for lightweight reactive UI state on top of the mounted MVP
+- Vue 3
+- Vite
 - pytest
 
 ## Domain Model
@@ -260,6 +261,7 @@ Implemented endpoints:
 Quick local run:
 
 - `uv run uvicorn apps.api.app.main:app --reload`
+- `cd apps/frontend && npm run dev` for the Vite dev server
 - open `http://127.0.0.1:8000/app`
 - load demo data from the session panel or call `POST /api/v1/auth/bootstrap-demo`
 
@@ -319,7 +321,8 @@ Useful internal references:
 ## Repository Structure
 
 - `apps/api`: backend API and domain logic
-- `apps/web`: mounted browser MVP
+- `apps/frontend`: Vue + Vite source frontend
+- `apps/web`: built frontend assets served by FastAPI
 - `tests`: backend and route registration tests
 - `docs`: product, architecture, and research notes
 
@@ -338,8 +341,8 @@ Current status:
 - backend Phase A scheduling core is implemented
 - session auth and role guards are implemented
 - persistence is available through SQLAlchemy
-- a browser MVP is available from the same FastAPI app
-- manual attendance scaffold is available for enrollment, submission, and review
+- a Vue frontend is built and served from the same FastAPI app
+- worker and manager browser flows cover scheduling, requests, review, face enrollment, and face attendance
 - CV enrollment and verification API scaffold is available behind the scheduling module
 - test suite is green with `uv run --no-sync pytest`
 
@@ -347,13 +350,10 @@ Current status:
 
 The scheduling MVP exists, but these parts are still incomplete:
 
-- browser UI does not yet drive the face-recognition flow end to end
 - real camera capture is wired only for the local browser MVP, not production hardened
 - liveness detection is not implemented
 - multi-template enrollment is not implemented
-- manager review UI for match evidence is still basic
-- Alpine is integrated incrementally for visible UI state, not yet for full list rendering
-- attendance CV persistence is implemented at backend level but still not surfaced in the browser flow
+- manager review UI for match evidence is still lighter than a production evidence console
 - deployment, storage, and async processing for media are still design-level, not production-level
 
 ## Roadmap

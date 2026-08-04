@@ -16,6 +16,8 @@ htmlcov/
 coverage.xml
 apps/web/node_modules/
 apps/web/dist/
+apps/frontend/node_modules/
+apps/frontend/dist/
 legacy/django-demo/db.sqlite3
 legacy/django-demo/__pycache__/
 legacy/django-demo/guardymed.egg-info/

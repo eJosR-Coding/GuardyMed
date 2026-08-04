@@ -19,27 +19,28 @@ async def test_web_mount_and_root_redirect_exist(client: AsyncClient) -> None:
 
 @pytest.mark.anyio
 async def test_web_static_assets_exist_and_contain_expected_ui_markers(client: AsyncClient) -> None:
-    web_dir = Path(__file__).resolve().parents[1] / "apps" / "web"
-    styles = (web_dir / "styles.css").read_text()
-    script = (web_dir / "app.js").read_text()
+    root = Path(__file__).resolve().parents[1]
+    source_dir = root / "apps" / "frontend"
+    web_dir = root / "apps" / "web"
+
+    package_json = (source_dir / "package.json").read_text()
+    app_vue = (source_dir / "src" / "App.vue").read_text()
+    source_styles = (source_dir / "src" / "styles.css").read_text()
     index = (web_dir / "index.html").read_text()
+    built_assets = sorted((web_dir / "assets").glob("*"))
 
-    assert ":root {" in styles
-    assert ".workflow-strip" in styles
-    assert ".overview-panel" in styles
-    assert ".camera-stage" in styles
+    assert '"vue"' in package_json
+    assert '"vite"' in package_json
 
-    assert "roleMeta" in script
-    assert "humanizeErrorMessage" in script
-    assert "window.guardyMedApp" in script
-    assert 'attendance/cv/attempts' in script
-    assert '"/auth/login"' in script
-    assert '"/scheduling/departments"' in script
+    assert "Manager workspace" in app_vue
+    assert "Worker workspace" in app_vue
+    assert "Face attendance" in app_vue
+    assert "attendance/cv/attempts" in app_vue
 
-    assert "GuardyMed" in index
-    assert "Manager planning workflow" in index
-    assert "Worker workflow" in index
-    assert "Manager review workflow" in index
-    assert 'x-data="guardyMedApp()"' in index
-    assert "alpinejs" in index
-    assert "Check in with face verification" in index
+    assert ".camera-frame" in source_styles
+    assert ".workspace-intro" in source_styles
+    assert ".evidence-card" in source_styles
+
+    assert '<div id="app"></div>' in index
+    assert "/assets/" in index
+    assert built_assets
