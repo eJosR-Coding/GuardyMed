@@ -172,6 +172,25 @@ export function useGuardyMedApp() {
     return statusLabel(value);
   }
 
+  function auditActionLabel(action) {
+    const labels = {
+      "department.created": "Department created",
+      "worker.created": "Worker registered",
+      "schedule_period.created": "Schedule period created",
+      "schedule_period.status_updated": "Schedule period updated",
+      "assignment.created": "Assignment created",
+      "assignment.updated": "Assignment updated",
+      "change_request.created": "Change request submitted",
+      "change_request.status_updated": "Change request updated",
+      "attendance_enrollment.created": "Attendance enrollment created",
+      "attendance_attempt.created": "Attendance attempt submitted",
+      "attendance_attempt.reviewed": "Attendance attempt reviewed",
+      "export.created": "Export created",
+      "approval_decision.created": "Approval decision recorded",
+    };
+    return labels[action] || statusLabel(String(action).replaceAll(".", "_"));
+  }
+
   function humanizeAuditValue(key, value) {
     if (value == null) return value;
     if (Array.isArray(value)) return value.map((item) => humanizeAuditValue(key, item));
@@ -190,6 +209,15 @@ export function useGuardyMedApp() {
 
   function auditPayloadText(payload) {
     return JSON.stringify(humanizeAuditValue("payload", payload), null, 2);
+  }
+
+  function auditPayloadEntries(payload) {
+    const normalized = humanizeAuditValue("payload", payload);
+    if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) return [];
+    return Object.entries(normalized).map(([key, value]) => ({
+      label: statusLabel(key.replaceAll(".", "_")),
+      value: Array.isArray(value) ? value.join(", ") : String(value),
+    }));
   }
 
   function resetCameraState() {
@@ -636,7 +664,9 @@ export function useGuardyMedApp() {
     statusLabel,
     requestTypeLabel,
     attemptTypeLabel,
+    auditActionLabel,
     auditPayloadText,
+    auditPayloadEntries,
     availableAssignmentWorkers,
     reviewItems,
     managerSections,

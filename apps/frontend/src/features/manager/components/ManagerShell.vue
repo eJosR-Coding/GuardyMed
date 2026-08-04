@@ -331,9 +331,20 @@ const vm = props.vm;
             </div>
             <div v-if="vm.state.auditEvents.length" class="stack">
               <article v-for="item in vm.state.auditEvents" :key="item.id" class="list-card">
-                <strong>{{ item.action }}</strong>
-                <div class="meta-chip-row"><span>{{ vm.statusLabel(item.entity_type) }}</span><span :title="item.entity_id">Record updated</span><span :title="item.actor_id">{{ vm.actorLabel(item.actor_id) }}</span></div>
-                <pre>{{ vm.auditPayloadText(item.payload) }}</pre>
+                <strong>{{ vm.auditActionLabel(item.action) }}</strong>
+                <div class="meta-chip-row">
+                  <span>{{ vm.statusLabel(item.entity_type) }}</span>
+                  <span :title="item.entity_id">Record updated</span>
+                  <span :title="item.actor_id">{{ vm.actorLabel(item.actor_id) }}</span>
+                  <span>{{ vm.formatDateTime(item.created_at) }}</span>
+                </div>
+                <div v-if="vm.auditPayloadEntries(item.payload).length" class="audit-entry-list">
+                  <div v-for="entry in vm.auditPayloadEntries(item.payload)" :key="entry.label" class="audit-entry">
+                    <span class="audit-entry-label">{{ entry.label }}</span>
+                    <strong class="audit-entry-value">{{ entry.value }}</strong>
+                  </div>
+                </div>
+                <pre v-else>{{ vm.auditPayloadText(item.payload) }}</pre>
               </article>
             </div>
             <div v-else class="empty-state">No audit events recorded yet.</div>
