@@ -77,6 +77,16 @@ This repository should be read as:
 - not a finished production product
 - ready for demo, walkthrough, and architecture discussion
 
+## C4 Architecture
+
+### C1 — System Context
+
+### C2 — Containers
+
+### C3 — Components
+
+Detailed diagrams and final narrative can be added after the visual C4 exports are prepared.
+
 ## User and System Flows
 
 ### Scheduling flow
