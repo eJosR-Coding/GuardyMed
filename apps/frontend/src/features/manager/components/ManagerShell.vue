@@ -4,6 +4,24 @@ const props = defineProps({
 });
 
 const vm = props.vm;
+
+const assignmentTypeOptions = [
+  { label: "Guard shift", value: "guard_shift" },
+  { label: "Shift lead", value: "shift_lead" },
+  { label: "On call", value: "on_call" },
+];
+
+function departmentOptionLabel(department) {
+  return `${department.name} (${department.code})`;
+}
+
+function workerOptionLabel(worker) {
+  return `${worker.full_name} · ${worker.worker_type}`;
+}
+
+function periodOptionLabel(period) {
+  return `${vm.periodLabel(period)} · ${vm.statusLabel(period.status)}`;
+}
 </script>
 
 <template>
@@ -18,12 +36,13 @@ const vm = props.vm;
           </div>
         </div>
 
-        <nav class="app-topbar-nav">
+        <nav class="app-topbar-nav" aria-label="Manager sections">
           <button
             v-for="item in vm.managerSections"
             :key="item.id"
             class="app-topbar-link"
             :class="{ active: vm.state.ui.managerSection === item.id }"
+            :aria-current="vm.state.ui.managerSection === item.id ? 'page' : undefined"
             type="button"
             @click="vm.setManagerSection(item.id)"
           >
@@ -105,12 +124,15 @@ const vm = props.vm;
               </div>
               <label>
                 <span>Department</span>
-                <select v-model="vm.state.forms.worker.department_id" required>
-                  <option value="">Select department</option>
-                  <option v-for="department in vm.state.departments" :key="department.id" :value="department.id">
-                    {{ department.name }} ({{ department.code }})
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.worker.department_id"
+                  :options="vm.state.departments"
+                  :optionLabel="departmentOptionLabel"
+                  optionValue="id"
+                  placeholder="Select department"
+                  fluid
+                  required
+                />
               </label>
               <button class="button button-primary" type="submit">Create worker</button>
             </form>
@@ -128,12 +150,15 @@ const vm = props.vm;
               </div>
               <label>
                 <span>Department</span>
-                <select v-model="vm.state.forms.period.department_id" required>
-                  <option value="">Select department</option>
-                  <option v-for="department in vm.state.departments" :key="department.id" :value="department.id">
-                    {{ department.name }} ({{ department.code }})
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.period.department_id"
+                  :options="vm.state.departments"
+                  :optionLabel="departmentOptionLabel"
+                  optionValue="id"
+                  placeholder="Select department"
+                  fluid
+                  required
+                />
               </label>
               <button class="button button-primary" type="submit">Create period</button>
             </form>
@@ -145,29 +170,38 @@ const vm = props.vm;
             <form class="stack" @submit.prevent="vm.submitAssignment">
               <label>
                 <span>Schedule period</span>
-                <select v-model="vm.state.forms.assignment.period_id" required @change="vm.syncAssignmentWorkerSelection">
-                  <option value="">Select period</option>
-                  <option v-for="period in vm.state.periods" :key="period.id" :value="period.id">
-                    {{ vm.periodLabel(period) }} · {{ vm.statusLabel(period.status) }}
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.assignment.period_id"
+                  :options="vm.state.periods"
+                  :optionLabel="periodOptionLabel"
+                  optionValue="id"
+                  placeholder="Select period"
+                  fluid
+                  required
+                  @update:modelValue="vm.syncAssignmentWorkerSelection"
+                />
               </label>
               <label>
                 <span>Worker</span>
-                <select v-model="vm.state.forms.assignment.worker_id" required>
-                  <option value="">Select worker</option>
-                  <option v-for="worker in vm.availableAssignmentWorkers.value" :key="worker.id" :value="worker.id">
-                    {{ worker.full_name }} · {{ worker.worker_type }}
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.assignment.worker_id"
+                  :options="vm.availableAssignmentWorkers.value"
+                  :optionLabel="workerOptionLabel"
+                  optionValue="id"
+                  placeholder="Select worker"
+                  fluid
+                  required
+                />
               </label>
               <label>
                 <span>Assignment type</span>
-                <select v-model="vm.state.forms.assignment.assignment_type">
-                  <option value="guard_shift">Guard shift</option>
-                  <option value="shift_lead">Shift lead</option>
-                  <option value="on_call">On call</option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.assignment.assignment_type"
+                  :options="assignmentTypeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  fluid
+                />
               </label>
               <div class="grid-triplet">
                 <label><span>Shift date</span><input v-model="vm.state.forms.assignment.shift_date" type="date" required /></label>
@@ -195,7 +229,7 @@ const vm = props.vm;
                       <span :title="period.created_by || 'system'">{{ vm.actorLabel(period.created_by) }}</span>
                     </div>
                   </div>
-                  <span :class="vm.badgeClass(period.status)" :title="period.status">{{ vm.statusLabel(period.status) }}</span>
+                  <PTag :value="vm.statusLabel(period.status)" :severity="vm.badgeSeverity(period.status)" :title="period.status" />
                 </div>
                 <button class="button button-ghost" type="button" @click="vm.loadCalendar(period.id)">Open period</button>
               </article>
@@ -240,12 +274,15 @@ const vm = props.vm;
             <form class="stack" @submit.prevent="vm.submitAttendanceEnrollment">
               <label>
                 <span>Worker</span>
-                <select v-model="vm.state.forms.attendanceEnrollment.worker_id" required>
-                  <option value="">Select worker</option>
-                  <option v-for="worker in vm.availableAttendanceEnrollmentWorkers.value" :key="worker.id" :value="worker.id">
-                    {{ worker.full_name }} · {{ worker.worker_type }}
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.attendanceEnrollment.worker_id"
+                  :options="vm.availableAttendanceEnrollmentWorkers.value"
+                  :optionLabel="workerOptionLabel"
+                  optionValue="id"
+                  placeholder="Select worker"
+                  fluid
+                  required
+                />
               </label>
               <button class="button button-secondary" type="submit">Create attendance enrollment</button>
             </form>
@@ -255,12 +292,15 @@ const vm = props.vm;
             <form class="stack" @submit.prevent="vm.submitFaceEnrollment">
               <label>
                 <span>Worker</span>
-                <select v-model="vm.state.forms.faceEnrollment.worker_id" required>
-                  <option value="">Select worker</option>
-                  <option v-for="worker in vm.availableFaceEnrollmentWorkers.value" :key="worker.id" :value="worker.id">
-                    {{ worker.full_name }} · {{ worker.worker_type }}
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.faceEnrollment.worker_id"
+                  :options="vm.availableFaceEnrollmentWorkers.value"
+                  :optionLabel="workerOptionLabel"
+                  optionValue="id"
+                  placeholder="Select worker"
+                  fluid
+                  required
+                />
               </label>
               <label><span>Face image</span><input type="file" accept="image/*" @change="vm.onFaceEnrollmentFileChange" required /></label>
               <button class="button button-primary" type="submit">Create face enrollment</button>
@@ -279,7 +319,7 @@ const vm = props.vm;
                       <span :title="item.created_by">{{ vm.actorLabel(item.created_by) }}</span>
                     </div>
                   </div>
-                  <span :class="vm.badgeClass(item.status)" :title="item.status">{{ vm.statusLabel(item.status) }}</span>
+                  <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" :title="item.status" />
                 </div>
               </article>
             </div>
@@ -305,7 +345,7 @@ const vm = props.vm;
               <article v-for="item in vm.reviewItems.value" :key="`${item.type}-${item.id}`" class="list-card">
                 <div class="list-card-head">
                   <div><strong>{{ item.title }}</strong><div class="meta-chip-row"><span v-for="meta in item.meta" :key="meta">{{ meta }}</span></div></div>
-                  <span :class="vm.badgeClass(item.status)" :title="item.status">{{ vm.statusLabel(item.status) }}</span>
+                  <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" :title="item.status" />
                 </div>
                 <p v-if="item.reason" class="support-copy">{{ item.reason }}</p>
                 <div v-if="item.matchResult" class="evidence-card">

@@ -4,6 +4,26 @@ const props = defineProps({
 });
 
 const vm = props.vm;
+
+const attemptTypeOptions = [
+  { label: "Check in", value: "check_in" },
+  { label: "Check out", value: "check_out" },
+];
+
+const requestTypeOptions = [
+  { label: "Swap", value: "swap" },
+  { label: "Replacement", value: "replacement" },
+  { label: "Incident", value: "incident" },
+  { label: "Adjustment", value: "adjustment" },
+];
+
+function assignmentOptionLabel(assignment) {
+  return `${assignment.shift_date} · ${assignment.start_time} · ${assignment.assignment_type}`;
+}
+
+function workerOptionLabel(worker) {
+  return `${worker.full_name} · ${worker.worker_type}`;
+}
 </script>
 
 <template>
@@ -18,12 +38,13 @@ const vm = props.vm;
           </div>
         </div>
 
-        <nav class="app-topbar-nav">
+        <nav class="app-topbar-nav" aria-label="Worker sections">
           <button
             v-for="item in vm.workerSections"
             :key="item.id"
             class="app-topbar-link"
             :class="{ active: vm.state.ui.workerSection === item.id }"
+            :aria-current="vm.state.ui.workerSection === item.id ? 'page' : undefined"
             type="button"
             @click="vm.setWorkerSection(item.id)"
           >
@@ -90,19 +111,25 @@ const vm = props.vm;
             <form class="stack" @submit.prevent="vm.submitAttendanceAttempt">
               <label>
                 <span>Assignment</span>
-                <select v-model="vm.state.forms.attendanceAttempt.assignment_id" required>
-                  <option value="">Select assignment</option>
-                  <option v-for="assignment in vm.state.workerAssignments" :key="assignment.id" :value="assignment.id">
-                    {{ assignment.shift_date }} · {{ assignment.start_time }} · {{ assignment.assignment_type }}
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.attendanceAttempt.assignment_id"
+                  :options="vm.state.workerAssignments"
+                  :optionLabel="assignmentOptionLabel"
+                  optionValue="id"
+                  placeholder="Select assignment"
+                  fluid
+                  required
+                />
               </label>
               <label>
                 <span>Attempt type</span>
-                <select v-model="vm.state.forms.attendanceAttempt.attempt_type">
-                  <option value="check_in">Check in</option>
-                  <option value="check_out">Check out</option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.attendanceAttempt.attempt_type"
+                  :options="attemptTypeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  fluid
+                />
               </label>
               <div class="camera-frame">
                 <video v-if="vm.state.camera.stream" :ref="vm.attachVideo" autoplay playsinline muted></video>
@@ -126,7 +153,7 @@ const vm = props.vm;
               <article v-for="item in vm.state.attendanceAttempts" :key="item.id" class="list-card">
                 <div class="list-card-head">
                   <div><strong>{{ item.attempt_type }}</strong><div class="meta-chip-row"><span>{{ item.assignment_id }}</span><span>{{ vm.formatDateTime(item.attempted_at) }}</span></div></div>
-                  <span :class="vm.badgeClass(item.decision_status)">{{ item.decision_status }}</span>
+                  <PTag :value="vm.statusLabel(item.decision_status)" :severity="vm.badgeSeverity(item.decision_status)" />
                 </div>
                 <p v-if="item.evidence_ref" class="support-copy">{{ item.evidence_ref }}</p>
                 <div v-if="vm.state.attendanceMatchResults[item.id]" class="evidence-card">
@@ -158,30 +185,37 @@ const vm = props.vm;
             <form class="stack" @submit.prevent="vm.submitChangeRequest">
               <label>
                 <span>Assignment</span>
-                <select v-model="vm.state.forms.changeRequest.assignment_id" required>
-                  <option value="">Select assignment</option>
-                  <option v-for="assignment in vm.state.workerAssignments" :key="assignment.id" :value="assignment.id">
-                    {{ assignment.shift_date }} · {{ assignment.start_time }} · {{ assignment.assignment_type }}
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.changeRequest.assignment_id"
+                  :options="vm.state.workerAssignments"
+                  :optionLabel="assignmentOptionLabel"
+                  optionValue="id"
+                  placeholder="Select assignment"
+                  fluid
+                  required
+                />
               </label>
               <label>
                 <span>Request type</span>
-                <select v-model="vm.state.forms.changeRequest.request_type">
-                  <option value="swap">Swap</option>
-                  <option value="replacement">Replacement</option>
-                  <option value="incident">Incident</option>
-                  <option value="adjustment">Adjustment</option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.changeRequest.request_type"
+                  :options="requestTypeOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  fluid
+                />
               </label>
               <label>
                 <span>Replacement worker</span>
-                <select v-model="vm.state.forms.changeRequest.replacement_worker_id">
-                  <option value="">No replacement</option>
-                  <option v-for="worker in vm.state.workers" :key="worker.id" :value="worker.id">
-                    {{ worker.full_name }} · {{ worker.worker_type }}
-                  </option>
-                </select>
+                <PSelect
+                  v-model="vm.state.forms.changeRequest.replacement_worker_id"
+                  :options="vm.state.workers"
+                  :optionLabel="workerOptionLabel"
+                  optionValue="id"
+                  placeholder="No replacement"
+                  showClear
+                  fluid
+                />
               </label>
               <label><span>Reason</span><textarea v-model="vm.state.forms.changeRequest.reason" rows="3" required /></label>
               <button class="button button-primary" type="submit">Submit request</button>
@@ -193,7 +227,7 @@ const vm = props.vm;
             <article v-for="item in vm.state.workerRequests" :key="item.id" class="list-card">
               <div class="list-card-head">
                 <div><strong>{{ item.request_type }}</strong><div class="meta-chip-row"><span :title="item.assignment_id">Assignment linked</span><span :title="item.requested_by">{{ vm.actorLabel(item.requested_by) }}</span></div></div>
-                <span :class="vm.badgeClass(item.status)" :title="item.status">{{ vm.statusLabel(item.status) }}</span>
+                <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" :title="item.status" />
               </div>
               <p class="support-copy">{{ item.reason }}</p>
             </article>

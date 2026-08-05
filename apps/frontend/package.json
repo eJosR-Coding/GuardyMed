@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@primevue/themes": "^4.5.4",
+    "primeicons": "^8.0.0",
+    "primevue": "^4.5.5",
     "vue": "3.5.40"
   },
   "devDependencies": {

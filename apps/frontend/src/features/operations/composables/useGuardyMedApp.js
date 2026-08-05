@@ -1,10 +1,12 @@
 import { computed, onBeforeUnmount, onMounted, reactive } from "vue";
+import { useToast } from "primevue/usetoast";
 
 import { roleMeta } from "../../../core/config/role-meta";
 import { api } from "../../../core/services/api";
-import { badgeClass, formatDateTime, periodLabel } from "../../../core/utils/formatters";
+import { badgeSeverity, formatDateTime, periodLabel } from "../../../core/utils/formatters";
 
 export function useGuardyMedApp() {
+  const toast = useToast();
   const managerSections = [
     { id: "overview", label: "Overview", helper: "See where the month stands and what needs attention first." },
     { id: "scheduling", label: "Scheduling", helper: "Create departments, workers, periods, and assignments." },
@@ -21,7 +23,6 @@ export function useGuardyMedApp() {
   const state = reactive({
     session: null,
     users: [],
-    flash: { kind: "success", message: "", visible: false },
     departments: [],
     workers: [],
     periods: [],
@@ -107,16 +108,19 @@ export function useGuardyMedApp() {
     state.workers.filter((worker) => enrolledWorkerIds.value.has(worker.id)),
   );
 
+  const FLASH_SEVERITY = { success: "success", error: "error" };
+
   function showFlash(message, kind = "success") {
-    state.flash.visible = true;
-    state.flash.message = message;
-    state.flash.kind = kind;
+    toast.add({
+      severity: FLASH_SEVERITY[kind] || "info",
+      summary: kind === "error" ? "Something went wrong" : "Done",
+      detail: message,
+      life: kind === "error" ? 6000 : 4000,
+    });
   }
 
   function clearFlash() {
-    state.flash.visible = false;
-    state.flash.message = "";
-    state.flash.kind = "success";
+    toast.removeAllGroups();
   }
 
   function applyDemoAccount(role) {
@@ -702,7 +706,7 @@ export function useGuardyMedApp() {
     reviewItems,
     managerSections,
     workerSections,
-    badgeClass,
+    badgeSeverity,
     periodLabel,
     formatDateTime,
     applyDemoAccount,
