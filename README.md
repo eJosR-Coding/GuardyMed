@@ -4,55 +4,56 @@ Version: `0.1.1`
 
 ## Overview
 
-GuardyMed is a healthcare workforce operations MVP focused on monthly shift scheduling, worker self-service flows, approval workflows, attendance scaffolding, auditability, and operational exports.
+GuardyMed is a healthcare workforce operations MVP for monthly guard scheduling, worker self-service, attendance verification, review queues, auditability, and exportable operational evidence.
 
 ## Problem Context
 
-Healthcare scheduling is often managed through fragmented tools such as spreadsheets, chat messages, and manual approval flows.
+Healthcare shift operations are often split across spreadsheets, chat threads, and manual approval steps.
 
-That creates predictable operational problems:
+That creates predictable failures:
 
-- schedules are harder to validate before use
-- shift changes are harder to trace
-- approvals are harder to reconstruct
-- exports for operations or compliance become manual work
+- schedules are harder to validate before they go live
+- worker requests are detached from the assigned shift
+- attendance evidence is inconsistent or manual
+- review decisions are harder to trace later
+- exports for operations or compliance become rework
 
-GuardyMed is being designed to reduce that operational fragmentation with a clearer scheduling core and an auditable workflow.
+GuardyMed reduces that fragmentation with one workflow that keeps schedule state, worker actions, attendance records, and review decisions in the same system.
 
-For portfolio purposes, the project is framed as a system-design-heavy healthcare product rather than a startup pitch or a generic admin dashboard.
+For portfolio purposes, the project is framed as a technically credible healthcare operations system rather than a generic dashboard.
 
 ## Current Scope
 
-The current repository scope is intentionally narrow.
+The current repository scope is intentionally narrow and demoable.
 
 It currently includes:
 
-- a FastAPI backend scaffold
-- a Vue + Vite frontend source app under `apps/frontend`
-- a production build served by FastAPI under `/app`
-- session-based workflows for manager and worker
-- scheduling, change request, approval, audit, export, and attendance scaffold endpoints
-- a basic browser face-enrollment and face-verification flow for the worker attendance demo
-- an initial Phase A system definition and architecture direction
+- a FastAPI backend with working API routes
+- a Vue 3 + Vite frontend under `apps/frontend`
+- a production-style build served by FastAPI under `/app`
+- cookie-backed session flows for manager and worker
+- scheduling, change request, review, audit, export, and attendance endpoints
+- a browser-based face-enrollment and face-verification demo path
+- architecture and AI/CV design notes for the next hardening stage
 
 ## Solution Direction
 
 GuardyMed currently solves the operational core first:
 
-- build a monthly schedule period
-- assign staff to guard shifts
+- define departments and workers
+- open a monthly schedule period
+- assign staff to shifts
 - enroll workers for attendance
-- let workers submit manual attendance attempts
 - let workers submit change requests
-- let managers review queue items
-- let managers review attendance attempts
+- let workers submit attendance attempts
+- let managers review requests and attendance outcomes
 - preserve audit events
 - generate monthly exports
 
 The current product story is:
 
-- manager builds the month
-- worker reacts to assigned work
+- manager prepares the month
+- worker responds to assigned work
 - manager reviews and closes the loop
 
 ## Architecture
@@ -64,9 +65,9 @@ Current implementation is a modular monolith:
 - one scheduling domain module
 - one persistence path through SQLAlchemy
 
-This keeps Phase A simple while preserving clear boundaries for later AI and CV modules.
+This keeps the MVP simple while preserving clear boundaries for the attendance CV module.
 
-The next planned AI boundary is face-recognition attendance only. The current MVP does not implement CV yet; it prepares the workflow and data boundaries for that future module.
+The AI scope is intentionally narrow: face-verification for attendance. The current MVP already exposes enrollment and verification demo flows, but it is not yet a hardened production CV pipeline.
 
 ## Phase Status
 
@@ -74,8 +75,8 @@ This repository should be read as:
 
 - `Phase 1 complete`
 - portfolio-grade MVP
-- not a finished production product
 - ready for demo, walkthrough, and architecture discussion
+- not yet hardened for production attendance capture
 
 ## C4 Architecture
 
@@ -93,11 +94,11 @@ This repository should be read as:
 
 ### C3 — Components
 
-![C3 Components](images/c4/c3-components.png)
+![C3 Components](images/c4/c3-components-v2.png)
 
 > Diagram created with FourLayer.
 
-Detailed diagrams and final narrative can be added after the visual C4 exports are prepared.
+These diagrams describe the current MVP boundary and the planned CV-focused extension point.
 
 ## User and System Flows
 
@@ -192,14 +193,14 @@ sequenceDiagram
 
 ## Deployment
 
-Local development runs as a single FastAPI process.
+Local development runs as a single FastAPI app plus an optional Vite dev server.
 
 - API docs: `/docs`
 - mounted app: `/app`
 - health check: `/health`
 - frontend dev server: `http://127.0.0.1:5173/`
 
-The production-style local build is served from FastAPI under `/app`.
+The production-style local build is served directly from FastAPI under `/app`.
 
 ## Demo Accounts
 
@@ -216,6 +217,20 @@ The production-style local build is served from FastAPI under `/app`.
 - Vite
 - PrimeVue
 - pytest
+
+## What Works Today
+
+- manager and worker sign-in flows
+- demo bootstrap for seeded data
+- department and worker creation
+- schedule-period creation and assignment management
+- worker assignment views
+- worker attendance attempts
+- worker change requests
+- manager review queue
+- audit trail inspection
+- monthly export generation
+- face enrollment and face-verification demo endpoints
 
 ## Domain Model
 
@@ -314,6 +329,7 @@ Production-style local UI:
 - reduced raw internal IDs in the UI
 - improved attendance enrollment guards
 - fixed FastAPI-mounted frontend asset paths under `/app`
+- added public C4 diagram image sections to the README
 
 Quick local run:
 
@@ -332,7 +348,7 @@ Quick local run:
 
 ## Face Recognition Decision
 
-The baseline verification method is still embedding comparison plus explicit thresholds.
+The baseline verification method is embedding comparison plus explicit thresholds.
 
 That is not a toy choice. It is the normal production baseline for face verification because the problem is:
 
