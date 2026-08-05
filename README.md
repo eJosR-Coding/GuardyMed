@@ -81,9 +81,15 @@ This repository should be read as:
 
 ### C1 — System Context
 
+![C1 System Context](images/c4/c1-context.png)
+
 ### C2 — Containers
 
+![C2 Containers](images/c4/c2-containers.png)
+
 ### C3 — Components
+
+![C3 Components](images/c4/c3-components.png)
 
 Detailed diagrams and final narrative can be added after the visual C4 exports are prepared.
 
