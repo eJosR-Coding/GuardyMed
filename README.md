@@ -83,13 +83,19 @@ This repository should be read as:
 
 ![C1 System Context](images/c4/c1-context.png)
 
+> Diagram created with FourLayer.
+
 ### C2 — Containers
 
 ![C2 Containers](images/c4/c2-containers.png)
 
+> Diagram created with FourLayer.
+
 ### C3 — Components
 
 ![C3 Components](images/c4/c3-components.png)
+
+> Diagram created with FourLayer.
 
 Detailed diagrams and final narrative can be added after the visual C4 exports are prepared.
 
