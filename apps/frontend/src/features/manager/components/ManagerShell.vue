@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from "vue";
+
 const props = defineProps({
   vm: { type: Object, required: true },
 });
@@ -10,6 +12,11 @@ const assignmentTypeOptions = [
   { label: "Shift lead", value: "shift_lead" },
   { label: "On call", value: "on_call" },
 ];
+
+const currentSection = computed(() => vm.managerSections.find((item) => item.id === vm.state.ui.managerSection));
+const selectedCalendarTitle = computed(() =>
+  vm.state.calendar ? `${vm.periodLabel(vm.state.calendar.period)} · ${vm.statusLabel(vm.state.calendar.period.status)}` : "No period selected",
+);
 
 function departmentOptionLabel(department) {
   return `${department.name} (${department.code})`;
@@ -25,372 +32,468 @@ function periodOptionLabel(period) {
 </script>
 
 <template>
-  <div class="workspace-app" v-if="vm.currentRole.value === 'manager'">
-    <header class="app-topbar">
-      <div class="app-topbar-inner">
-        <div class="app-topbar-brand">
-          <p class="brand-mark">GuardyMed</p>
-          <div>
-            <strong>Manager</strong>
-            <p>Plan shifts, attendance, and review.</p>
-          </div>
-        </div>
-
-        <nav class="app-topbar-nav" aria-label="Manager sections">
-          <button
-            v-for="item in vm.managerSections"
-            :key="item.id"
-            class="app-topbar-link"
-            :class="{ active: vm.state.ui.managerSection === item.id }"
-            :aria-current="vm.state.ui.managerSection === item.id ? 'page' : undefined"
-            type="button"
-            @click="vm.setManagerSection(item.id)"
-          >
-            {{ item.label }}
-          </button>
-        </nav>
-
-        <div class="app-topbar-profile">
-          <div>
-            <strong>{{ vm.state.session?.full_name }}</strong>
-            <p>{{ vm.state.session?.email }}</p>
-          </div>
-          <button class="button button-secondary" type="button" @click="vm.logout">Log out</button>
+  <div class="ops-shell ops-shell-manager" v-if="vm.currentRole.value === 'manager'">
+    <aside class="ops-sidebar">
+      <div class="ops-sidebar-brand">
+        <div class="ops-logo">G</div>
+        <div>
+          <strong>GuardyMed</strong>
+          <small>Manager console</small>
         </div>
       </div>
-    </header>
 
-    <main class="workspace-main workspace-main-wide">
-      <header class="workspace-header workspace-header-flat">
-        <div>
-          <p class="kicker">Manager</p>
-          <h1>{{ vm.managerSections.find((item) => item.id === vm.state.ui.managerSection)?.label }}</h1>
-          <p class="support-copy">{{ vm.managerSections.find((item) => item.id === vm.state.ui.managerSection)?.helper }}</p>
+      <div class="ops-sidebar-block">
+        <p class="ops-sidebar-label">Workflow</p>
+        <div class="ops-sidebar-ledger">
+          <div class="done">1. Build the month</div>
+          <div class="done">2. Prepare attendance</div>
+          <div class="active">3. Review decisions</div>
+          <div>4. Export evidence</div>
         </div>
-        <div class="workspace-header-actions">
-          <button class="button button-ghost" type="button" @click="vm.refreshManagerData">Refresh data</button>
-          <button class="button button-ghost" type="button" @click="vm.refreshManagerReviewData">Refresh review</button>
+      </div>
+
+      <nav class="ops-sidebar-nav" aria-label="Manager sections">
+        <button
+          v-for="item in vm.managerSections"
+          :key="item.id"
+          class="ops-nav-link"
+          :class="{ active: vm.state.ui.managerSection === item.id }"
+          type="button"
+          @click="vm.setManagerSection(item.id)"
+        >
+          <span>{{ item.label }}</span>
+          <small v-if="item.id === 'review' && vm.managerPendingCount.value">{{ vm.managerPendingCount.value }}</small>
+        </button>
+      </nav>
+
+      <div class="ops-sidebar-user">
+        <div class="ops-avatar">MA</div>
+        <div>
+          <strong>{{ vm.state.session?.full_name }}</strong>
+          <p>{{ vm.state.session?.email }}</p>
+        </div>
+      </div>
+    </aside>
+
+    <div class="ops-main">
+      <header class="ops-topbar">
+        <div>
+          <p class="ops-breadcrumb">Manager / {{ currentSection?.label }}</p>
+          <h1>{{ currentSection?.label }}</h1>
+        </div>
+        <div class="ops-topbar-actions">
+          <span class="ops-status-chip">{{ vm.state.calendar ? vm.statusLabel(vm.state.calendar.period.status) : 'MVP demo' }}</span>
+          <button class="button button-secondary" type="button" @click="vm.refreshManagerData">Refresh data</button>
+          <button class="button button-secondary" type="button" @click="vm.refreshManagerReviewData">Refresh review</button>
+          <button class="button button-ghost" type="button" @click="vm.logout">Log out</button>
         </div>
       </header>
 
-      <template v-if="vm.state.ui.managerSection === 'overview'">
-        <section class="overview-grid">
-          <article class="overview-card"><span>Departments</span><strong>{{ vm.counts.value.departments }}</strong></article>
-          <article class="overview-card"><span>Workers</span><strong>{{ vm.counts.value.workers }}</strong></article>
-          <article class="overview-card"><span>Periods</span><strong>{{ vm.counts.value.periods }}</strong></article>
-          <article class="overview-card"><span>Selected period</span><strong>{{ vm.counts.value.selectedPeriod }}</strong></article>
+      <main class="ops-content">
+        <section class="ops-page-intro">
+          <div>
+            <p class="ops-page-label">Operations workspace</p>
+            <h2>{{ currentSection?.helper }}</h2>
+          </div>
+          <div class="ops-intro-note">
+            <strong>Current period</strong>
+            <p>{{ selectedCalendarTitle }}</p>
+          </div>
         </section>
 
-        <section class="workspace-intro">
-          <article class="workspace-card"><span class="workspace-label">Step 1</span><strong>Build scheduling data</strong><p>Create departments, workers, periods, and assignments.</p></article>
-          <article class="workspace-card"><span class="workspace-label">Step 2</span><strong>Prepare attendance</strong><p>Enroll attendance and upload the worker face baseline.</p></article>
-          <article class="workspace-card"><span class="workspace-label">Step 3</span><strong>Close review</strong><p>Inspect evidence, resolve requests, and export the approved month.</p></article>
-        </section>
+        <template v-if="vm.state.ui.managerSection === 'overview'">
+          <section class="ops-kpi-grid">
+            <article class="ops-kpi-card"><span>Departments</span><strong>{{ vm.counts.value.departments }}</strong></article>
+            <article class="ops-kpi-card"><span>Workers</span><strong>{{ vm.counts.value.workers }}</strong></article>
+            <article class="ops-kpi-card"><span>Periods</span><strong>{{ vm.counts.value.periods }}</strong></article>
+            <article class="ops-kpi-card"><span>Pending review</span><strong>{{ vm.managerPendingCount.value }}</strong></article>
+          </section>
 
-        <section class="grid-two">
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Next action</p><h3>Scheduling setup</h3></div></div>
-            <p class="support-copy">Open scheduling to create the month, assign workers, and inspect the period calendar.</p>
-            <button class="button button-primary" type="button" @click="vm.setManagerSection('scheduling')">Go to scheduling</button>
-          </article>
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Pending</p><h3>Review queue</h3></div></div>
-            <p class="support-copy">{{ vm.managerPendingCount.value }} items are waiting for a manager decision.</p>
-            <button class="button button-primary" type="button" @click="vm.setManagerSection('review')">Open review</button>
-          </article>
-        </section>
-      </template>
-
-      <template v-if="vm.state.ui.managerSection === 'scheduling'">
-        <section class="grid-two">
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Setup</p><h3>Register department</h3></div></div>
-            <p class="support-copy">Create a service like ICU or Pediatrics. Emergency already exists in demo data.</p>
-            <form class="stack" @submit.prevent="vm.submitDepartment">
-              <label><span>Department name</span><input v-model="vm.state.forms.department.name" required /></label>
-              <label><span>Department code</span><input v-model="vm.state.forms.department.code" required /></label>
-              <button class="button button-primary" type="submit">Create department</button>
-            </form>
-          </article>
-
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Setup</p><h3>Register worker</h3></div></div>
-            <p class="support-copy">Document IDs must be unique and each worker belongs to one department.</p>
-            <form class="stack" @submit.prevent="vm.submitWorker">
-              <label><span>Full name</span><input v-model="vm.state.forms.worker.full_name" required /></label>
-              <div class="grid-split">
-                <label><span>Document ID</span><input v-model="vm.state.forms.worker.document_id" required /></label>
-                <label><span>Worker type</span><input v-model="vm.state.forms.worker.worker_type" required /></label>
+          <section class="ops-overview-grid">
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Operational sequence</h3>
+                  <p>Follow the same order every month.</p>
+                </div>
               </div>
-              <label>
-                <span>Department</span>
-                <PSelect
-                  v-model="vm.state.forms.worker.department_id"
-                  :options="vm.state.departments"
-                  :optionLabel="departmentOptionLabel"
-                  optionValue="id"
-                  placeholder="Select department"
-                  fluid
-                  required
-                />
-              </label>
-              <button class="button button-primary" type="submit">Create worker</button>
-            </form>
-          </article>
-        </section>
-
-        <section class="grid-two">
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Month setup</p><h3>Create schedule period</h3></div></div>
-            <p class="support-copy">Open a month for one department. The same department-month combination can exist only once.</p>
-            <form class="stack" @submit.prevent="vm.submitPeriod">
-              <div class="grid-split">
-                <label><span>Year</span><input v-model.number="vm.state.forms.period.year" type="number" min="2024" max="2035" required /></label>
-                <label><span>Month</span><input v-model.number="vm.state.forms.period.month" type="number" min="1" max="12" required /></label>
+              <div class="ops-step-list">
+                <div class="ops-step-item">
+                  <strong>Scheduling readiness</strong>
+                  <p>Create departments, workers, periods, and assignments before attendance starts.</p>
+                  <button class="button button-primary" type="button" @click="vm.setManagerSection('scheduling')">Open scheduling</button>
+                </div>
+                <div class="ops-step-item">
+                  <strong>Attendance readiness</strong>
+                  <p>Enroll workers for attendance and register face-verification baseline images.</p>
+                  <button class="button button-secondary" type="button" @click="vm.setManagerSection('attendance')">Open attendance</button>
+                </div>
+                <div class="ops-step-item">
+                  <strong>Decision closure</strong>
+                  <p>Resolve requests and attendance review items before exporting the month.</p>
+                  <button class="button button-secondary" type="button" @click="vm.setManagerSection('review')">Open review</button>
+                </div>
               </div>
-              <label>
-                <span>Department</span>
-                <PSelect
-                  v-model="vm.state.forms.period.department_id"
-                  :options="vm.state.departments"
-                  :optionLabel="departmentOptionLabel"
-                  optionValue="id"
-                  placeholder="Select department"
-                  fluid
-                  required
-                />
-              </label>
-              <button class="button button-primary" type="submit">Create period</button>
-            </form>
-          </article>
+            </article>
 
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Month setup</p><h3>Create assignment</h3></div></div>
-            <p class="support-copy">Assignments only work on draft periods and must belong to the same department.</p>
-            <form class="stack" @submit.prevent="vm.submitAssignment">
-              <label>
-                <span>Schedule period</span>
-                <PSelect
-                  v-model="vm.state.forms.assignment.period_id"
-                  :options="vm.state.periods"
-                  :optionLabel="periodOptionLabel"
-                  optionValue="id"
-                  placeholder="Select period"
-                  fluid
-                  required
-                  @update:modelValue="vm.syncAssignmentWorkerSelection"
-                />
-              </label>
-              <label>
-                <span>Worker</span>
-                <PSelect
-                  v-model="vm.state.forms.assignment.worker_id"
-                  :options="vm.availableAssignmentWorkers.value"
-                  :optionLabel="workerOptionLabel"
-                  optionValue="id"
-                  placeholder="Select worker"
-                  fluid
-                  required
-                />
-              </label>
-              <label>
-                <span>Assignment type</span>
-                <PSelect
-                  v-model="vm.state.forms.assignment.assignment_type"
-                  :options="assignmentTypeOptions"
-                  optionLabel="label"
-                  optionValue="value"
-                  fluid
-                />
-              </label>
-              <div class="grid-triplet">
-                <label><span>Shift date</span><input v-model="vm.state.forms.assignment.shift_date" type="date" required /></label>
-                <label><span>Start time</span><input v-model="vm.state.forms.assignment.start_time" type="time" required /></label>
-                <label><span>End time</span><input v-model="vm.state.forms.assignment.end_time" type="time" required /></label>
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Review queue</h3>
+                  <p>Everything waiting for a manager decision.</p>
+                </div>
               </div>
-              <label><span>Notes</span><textarea v-model="vm.state.forms.assignment.notes" rows="2" /></label>
-              <button class="button button-primary" type="submit">Create assignment</button>
-            </form>
-          </article>
-        </section>
+              <div v-if="vm.reviewItems.value.length" class="ops-list-stack">
+                <article v-for="item in vm.reviewItems.value.slice(0, 4)" :key="`${item.type}-${item.id}`" class="ops-list-card">
+                  <div class="ops-list-row">
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <p>{{ item.reason || item.meta.join(' · ') }}</p>
+                    </div>
+                    <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" />
+                  </div>
+                </article>
+              </div>
+              <div v-else class="ops-empty-state">
+                <strong>No review items are waiting.</strong>
+                <p>The manager queue is currently clear.</p>
+              </div>
+            </article>
+          </section>
+        </template>
 
-        <section class="grid-two">
-          <article class="surface-card">
-            <div class="card-heading">
-              <div><p class="kicker">Inspect</p><h3>Available periods</h3></div>
-            </div>
-            <div v-if="vm.state.periods.length" class="stack">
-              <article v-for="period in vm.state.periods" :key="period.id" class="list-card">
-                <div class="list-card-head">
-                  <div>
-                    <strong>{{ vm.periodLabel(period) }}</strong>
-                    <div class="meta-chip-row">
-                      <span :title="period.department_id">{{ vm.departmentLabel(period.department_id) }}</span>
-                      <span :title="period.created_by || 'system'">{{ vm.actorLabel(period.created_by) }}</span>
+        <template v-if="vm.state.ui.managerSection === 'scheduling'">
+          <section class="ops-section-grid">
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Structure setup</h3>
+                  <p>Create services and register workers in the correct department.</p>
+                </div>
+              </div>
+
+              <div class="ops-form-columns">
+                <form class="ops-form-stack" @submit.prevent="vm.submitDepartment">
+                  <h4>Create department</h4>
+                  <label class="ops-field"><span>Department name</span><input v-model="vm.state.forms.department.name" required /></label>
+                  <label class="ops-field"><span>Department code</span><input v-model="vm.state.forms.department.code" required /></label>
+                  <button class="button button-primary" type="submit">Create department</button>
+                </form>
+
+                <form class="ops-form-stack" @submit.prevent="vm.submitWorker">
+                  <h4>Register worker</h4>
+                  <label class="ops-field"><span>Full name</span><input v-model="vm.state.forms.worker.full_name" required /></label>
+                  <div class="ops-inline-grid">
+                    <label class="ops-field"><span>Document ID</span><input v-model="vm.state.forms.worker.document_id" required /></label>
+                    <label class="ops-field"><span>Worker type</span><input v-model="vm.state.forms.worker.worker_type" required /></label>
+                  </div>
+                  <label class="ops-field">
+                    <span>Department</span>
+                    <PSelect
+                      v-model="vm.state.forms.worker.department_id"
+                      :options="vm.state.departments"
+                      :optionLabel="departmentOptionLabel"
+                      optionValue="id"
+                      placeholder="Select department"
+                      fluid
+                      required
+                    />
+                  </label>
+                  <button class="button button-secondary" type="submit">Create worker</button>
+                </form>
+              </div>
+            </article>
+
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Monthly roster</h3>
+                  <p>Open a period, then add assignments tied to workers in the same department.</p>
+                </div>
+              </div>
+
+              <div class="ops-form-columns">
+                <form class="ops-form-stack" @submit.prevent="vm.submitPeriod">
+                  <h4>Create period</h4>
+                  <div class="ops-inline-grid">
+                    <label class="ops-field"><span>Year</span><input v-model.number="vm.state.forms.period.year" type="number" min="2024" max="2035" required /></label>
+                    <label class="ops-field"><span>Month</span><input v-model.number="vm.state.forms.period.month" type="number" min="1" max="12" required /></label>
+                  </div>
+                  <label class="ops-field">
+                    <span>Department</span>
+                    <PSelect
+                      v-model="vm.state.forms.period.department_id"
+                      :options="vm.state.departments"
+                      :optionLabel="departmentOptionLabel"
+                      optionValue="id"
+                      placeholder="Select department"
+                      fluid
+                      required
+                    />
+                  </label>
+                  <button class="button button-secondary" type="submit">Create period</button>
+                </form>
+
+                <form class="ops-form-stack" @submit.prevent="vm.submitAssignment">
+                  <h4>Create assignment</h4>
+                  <label class="ops-field">
+                    <span>Schedule period</span>
+                    <PSelect
+                      v-model="vm.state.forms.assignment.period_id"
+                      :options="vm.state.periods"
+                      :optionLabel="periodOptionLabel"
+                      optionValue="id"
+                      placeholder="Select period"
+                      fluid
+                      required
+                      @update:modelValue="vm.syncAssignmentWorkerSelection"
+                    />
+                  </label>
+                  <label class="ops-field">
+                    <span>Worker</span>
+                    <PSelect
+                      v-model="vm.state.forms.assignment.worker_id"
+                      :options="vm.availableAssignmentWorkers.value"
+                      :optionLabel="workerOptionLabel"
+                      optionValue="id"
+                      placeholder="Select worker"
+                      fluid
+                      required
+                    />
+                  </label>
+                  <label class="ops-field">
+                    <span>Assignment type</span>
+                    <PSelect
+                      v-model="vm.state.forms.assignment.assignment_type"
+                      :options="assignmentTypeOptions"
+                      optionLabel="label"
+                      optionValue="value"
+                      fluid
+                    />
+                  </label>
+                  <div class="ops-inline-grid ops-inline-grid-3">
+                    <label class="ops-field"><span>Shift date</span><input v-model="vm.state.forms.assignment.shift_date" type="date" required /></label>
+                    <label class="ops-field"><span>Start time</span><input v-model="vm.state.forms.assignment.start_time" type="time" required /></label>
+                    <label class="ops-field"><span>End time</span><input v-model="vm.state.forms.assignment.end_time" type="time" required /></label>
+                  </div>
+                  <label class="ops-field"><span>Notes</span><textarea v-model="vm.state.forms.assignment.notes" rows="2" /></label>
+                  <button class="button button-primary" type="submit">Create assignment</button>
+                </form>
+              </div>
+            </article>
+          </section>
+
+          <section class="ops-section-grid ops-section-grid-wide">
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Available periods</h3>
+                  <p>Open one period to inspect assignments and status.</p>
+                </div>
+              </div>
+
+              <div v-if="vm.state.periods.length" class="ops-list-stack">
+                <article v-for="period in vm.state.periods" :key="period.id" class="ops-list-card">
+                  <div class="ops-list-row">
+                    <div>
+                      <strong>{{ vm.periodLabel(period) }}</strong>
+                      <p>{{ vm.departmentLabel(period.department_id) }} · {{ vm.actorLabel(period.created_by) }}</p>
+                    </div>
+                    <div class="ops-list-actions">
+                      <PTag :value="vm.statusLabel(period.status)" :severity="vm.badgeSeverity(period.status)" />
+                      <button class="button button-ghost" type="button" @click="vm.loadCalendar(period.id)">Open period</button>
                     </div>
                   </div>
-                  <PTag :value="vm.statusLabel(period.status)" :severity="vm.badgeSeverity(period.status)" :title="period.status" />
-                </div>
-                <button class="button button-ghost" type="button" @click="vm.loadCalendar(period.id)">Open period</button>
-              </article>
-            </div>
-            <div v-else class="empty-state">No periods yet. Create the monthly schedule first.</div>
-          </article>
-
-          <article class="surface-card">
-            <div class="card-heading">
-              <div><p class="kicker">Calendar</p><h3>{{ vm.state.calendar ? `${vm.periodLabel(vm.state.calendar.period)} · ${vm.statusLabel(vm.state.calendar.period.status)}` : "Selected period" }}</h3></div>
-              <div class="button-row">
-                <button class="button button-secondary" type="button" :disabled="!vm.canSendReview.value" @click="vm.sendToReview">Send to review</button>
-                <button class="button button-primary" type="button" :disabled="!vm.canCreateExport.value" @click="vm.createExport">Create export</button>
+                </article>
               </div>
-            </div>
-            <div class="info-banner info-banner-muted">
-              {{ vm.state.calendar ? `${vm.state.calendar.assignments.length} assignments in ${vm.periodLabel(vm.state.calendar.period)}.` : "Choose a period to inspect the roster." }}
-            </div>
-            <div v-if="vm.state.calendar?.assignments?.length" class="stack">
-              <article v-for="assignment in vm.state.calendar.assignments" :key="assignment.id" class="list-card">
-                <strong>{{ vm.state.workers.find((worker) => worker.id === assignment.worker_id)?.full_name || assignment.worker_id }}</strong>
-                <div class="meta-chip-row"><span>{{ assignment.shift_date }}</span><span>{{ assignment.start_time }} to {{ assignment.end_time }}</span><span>{{ assignment.assignment_type }}</span></div>
-                <p v-if="assignment.notes" class="support-copy">{{ assignment.notes }}</p>
-              </article>
-            </div>
-            <div v-else class="empty-state">No assignments yet for this period.</div>
-          </article>
-        </section>
-      </template>
+              <div v-else class="ops-empty-state">
+                <strong>No periods yet.</strong>
+                <p>Create the first schedule period to begin the monthly roster.</p>
+              </div>
+            </article>
 
-      <template v-if="vm.state.ui.managerSection === 'attendance'">
-        <section class="workspace-intro">
-          <article class="workspace-card"><span class="workspace-label">Step 1</span><strong>Enroll attendance</strong><p>Make the worker eligible for attendance tracking.</p></article>
-          <article class="workspace-card"><span class="workspace-label">Step 2</span><strong>Upload face baseline</strong><p>Create the template used for verification matching.</p></article>
-          <article class="workspace-card"><span class="workspace-label">Step 3</span><strong>Inspect readiness</strong><p>Confirm the enrollment is visible before workers start using attendance.</p></article>
-        </section>
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Selected period roster</h3>
+                  <p>{{ selectedCalendarTitle }}</p>
+                </div>
+                <div class="ops-list-actions">
+                  <button class="button button-secondary" type="button" :disabled="!vm.canSendReview.value" @click="vm.sendToReview">Send to review</button>
+                  <button class="button button-primary" type="button" :disabled="!vm.canCreateExport.value" @click="vm.createExport">Create export</button>
+                </div>
+              </div>
 
-        <section class="grid-two">
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Attendance readiness</p><h3>Enroll attendance and face verification</h3></div></div>
-            <p class="support-copy">A worker first needs manual attendance enrollment, then a face template for CV attendance.</p>
-            <form class="stack" @submit.prevent="vm.submitAttendanceEnrollment">
-              <label>
-                <span>Worker</span>
-                <PSelect
-                  v-model="vm.state.forms.attendanceEnrollment.worker_id"
-                  :options="vm.availableAttendanceEnrollmentWorkers.value"
-                  :optionLabel="workerOptionLabel"
-                  optionValue="id"
-                  placeholder="Select worker"
-                  fluid
-                  required
-                />
-              </label>
-              <button class="button button-secondary" type="submit">Create attendance enrollment</button>
-            </form>
+              <div v-if="vm.state.calendar?.assignments?.length" class="ops-table-wrap">
+                <table class="ops-table">
+                  <thead>
+                    <tr>
+                      <th>Worker</th>
+                      <th>Date</th>
+                      <th>Window</th>
+                      <th>Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="assignment in vm.state.calendar.assignments" :key="assignment.id">
+                      <td>{{ vm.state.workers.find((worker) => worker.id === assignment.worker_id)?.full_name || assignment.worker_id }}</td>
+                      <td>{{ assignment.shift_date }}</td>
+                      <td>{{ assignment.start_time }} to {{ assignment.end_time }}</td>
+                      <td>{{ vm.statusLabel(assignment.assignment_type) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="ops-empty-state">
+                <strong>No assignments yet.</strong>
+                <p>Select a period to inspect its roster or add assignments first.</p>
+              </div>
+            </article>
+          </section>
+        </template>
 
-            <div class="divider"></div>
+        <template v-if="vm.state.ui.managerSection === 'attendance'">
+          <section class="ops-section-grid">
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Attendance readiness</h3>
+                  <p>Enrollment comes first. Face-verification baseline comes second.</p>
+                </div>
+              </div>
 
-            <form class="stack" @submit.prevent="vm.submitFaceEnrollment">
-              <label>
-                <span>Worker</span>
-                <PSelect
-                  v-model="vm.state.forms.faceEnrollment.worker_id"
-                  :options="vm.availableFaceEnrollmentWorkers.value"
-                  :optionLabel="workerOptionLabel"
-                  optionValue="id"
-                  placeholder="Select worker"
-                  fluid
-                  required
-                />
-              </label>
-              <label><span>Face image</span><input type="file" accept="image/*" @change="vm.onFaceEnrollmentFileChange" required /></label>
-              <button class="button button-primary" type="submit">Create face enrollment</button>
-            </form>
-          </article>
+              <div class="ops-form-columns">
+                <form class="ops-form-stack" @submit.prevent="vm.submitAttendanceEnrollment">
+                  <h4>Attendance enrollment</h4>
+                  <label class="ops-field">
+                    <span>Worker</span>
+                    <PSelect
+                      v-model="vm.state.forms.attendanceEnrollment.worker_id"
+                      :options="vm.availableAttendanceEnrollmentWorkers.value"
+                      :optionLabel="workerOptionLabel"
+                      optionValue="id"
+                      placeholder="Select worker"
+                      fluid
+                      required
+                    />
+                  </label>
+                  <button class="button button-secondary" type="submit">Create attendance enrollment</button>
+                </form>
 
-          <article class="surface-card">
-            <div class="card-heading"><div><p class="kicker">Current evidence</p><h3>Attendance enrollments</h3></div></div>
-            <div v-if="vm.state.attendanceEnrollments.length" class="stack">
-              <article v-for="item in vm.state.attendanceEnrollments" :key="item.id" class="list-card">
-                <div class="list-card-head">
-                  <div>
-                    <strong>{{ vm.workerLabel(item.worker_id) }}</strong>
-                    <div class="meta-chip-row">
-                      <span :title="item.worker_id">Worker record</span>
-                      <span :title="item.created_by">{{ vm.actorLabel(item.created_by) }}</span>
+                <form class="ops-form-stack" @submit.prevent="vm.submitFaceEnrollment">
+                  <h4>Face baseline</h4>
+                  <label class="ops-field">
+                    <span>Worker</span>
+                    <PSelect
+                      v-model="vm.state.forms.faceEnrollment.worker_id"
+                      :options="vm.availableFaceEnrollmentWorkers.value"
+                      :optionLabel="workerOptionLabel"
+                      optionValue="id"
+                      placeholder="Select worker"
+                      fluid
+                      required
+                    />
+                  </label>
+                  <label class="ops-field"><span>Face image</span><input type="file" accept="image/*" @change="vm.onFaceEnrollmentFileChange" required /></label>
+                  <button class="button button-primary" type="submit">Create face enrollment</button>
+                </form>
+              </div>
+            </article>
+
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Enrollment status</h3>
+                  <p>Current attendance readiness per worker.</p>
+                </div>
+              </div>
+              <div v-if="vm.state.attendanceEnrollments.length" class="ops-list-stack">
+                <article v-for="item in vm.state.attendanceEnrollments" :key="item.id" class="ops-list-card">
+                  <div class="ops-list-row">
+                    <div>
+                      <strong>{{ vm.workerLabel(item.worker_id) }}</strong>
+                      <p>{{ vm.actorLabel(item.created_by) }}</p>
+                    </div>
+                    <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" />
+                  </div>
+                </article>
+                <div class="ops-inline-note">{{ vm.state.faceEnrollmentSummary }}</div>
+              </div>
+              <div v-else class="ops-empty-state">
+                <strong>No attendance enrollments yet.</strong>
+                <p>Create attendance enrollment records before workers can submit attempts.</p>
+              </div>
+            </article>
+          </section>
+        </template>
+
+        <template v-if="vm.state.ui.managerSection === 'review'">
+          <section class="ops-section-grid">
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Review queue</h3>
+                  <p>Requests and attendance items waiting for a decision.</p>
+                </div>
+              </div>
+              <div v-if="vm.reviewItems.value.length" class="ops-list-stack">
+                <article v-for="item in vm.reviewItems.value" :key="`${item.type}-${item.id}`" class="ops-list-card">
+                  <div class="ops-list-row">
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <p>{{ item.reason || item.meta.join(' · ') }}</p>
+                      <div v-if="item.matchResult" class="ops-evidence-meta">
+                        <span>Route: {{ item.matchResult.route }}</span>
+                        <span>Score: {{ Number(item.matchResult.similarity_score).toFixed(4) }}</span>
+                        <span>{{ item.matchResult.detector_name }}</span>
+                      </div>
+                    </div>
+                    <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" />
+                  </div>
+                  <div class="ops-list-actions">
+                    <button class="button button-primary" type="button" @click="vm.recordDecision(item, true)">Approve</button>
+                    <button class="button button-secondary" type="button" @click="vm.recordDecision(item, false)">Reject</button>
+                  </div>
+                </article>
+              </div>
+              <div v-else class="ops-empty-state">
+                <strong>No pending decisions.</strong>
+                <p>The review queue is clear for now.</p>
+              </div>
+            </article>
+
+            <article class="ops-panel">
+              <div class="ops-panel-head">
+                <div>
+                  <h3>Audit trail</h3>
+                  <p>Recent actions recorded by the system.</p>
+                </div>
+              </div>
+              <div v-if="vm.state.auditEvents.length" class="ops-list-stack">
+                <article v-for="item in vm.state.auditEvents" :key="item.id" class="ops-list-card">
+                  <div class="ops-list-row">
+                    <div>
+                      <strong>{{ vm.auditActionLabel(item.action) }}</strong>
+                      <p>{{ vm.actorLabel(item.actor_id) }} · {{ vm.formatDateTime(item.created_at) }}</p>
                     </div>
                   </div>
-                  <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" :title="item.status" />
-                </div>
-              </article>
-            </div>
-            <div v-else class="empty-state">No attendance enrollments yet.</div>
-            <div class="info-banner info-banner-muted">{{ vm.state.faceEnrollmentSummary }}</div>
-          </article>
-        </section>
-      </template>
-
-      <template v-if="vm.state.ui.managerSection === 'review'">
-        <section class="workspace-intro review-intro">
-          <article class="workspace-card"><span class="workspace-label">Review</span><strong>Close pending decisions</strong><p>{{ vm.managerPendingCount.value }} items are currently waiting for a manager decision.</p></article>
-          <article class="workspace-card"><span class="workspace-label">Evidence</span><strong>Inspect CV outcomes</strong><p>Attendance attempts with CV evidence include route, score, and detector metadata.</p></article>
-          <article class="workspace-card"><span class="workspace-label">Audit</span><strong>Trace system actions</strong><p>The audit trail records what changed, who triggered it, and when it happened.</p></article>
-        </section>
-
-        <section class="grid-two">
-          <article class="surface-card">
-            <div class="card-heading">
-              <div><p class="kicker">Manager review</p><h3>Review queue</h3></div>
-            </div>
-            <div v-if="vm.reviewItems.value.length" class="stack">
-              <article v-for="item in vm.reviewItems.value" :key="`${item.type}-${item.id}`" class="list-card">
-                <div class="list-card-head">
-                  <div><strong>{{ item.title }}</strong><div class="meta-chip-row"><span v-for="meta in item.meta" :key="meta">{{ meta }}</span></div></div>
-                  <PTag :value="vm.statusLabel(item.status)" :severity="vm.badgeSeverity(item.status)" :title="item.status" />
-                </div>
-                <p v-if="item.reason" class="support-copy">{{ item.reason }}</p>
-                <div v-if="item.matchResult" class="evidence-card">
-                  <span class="evidence-label">CV evidence</span>
-                  <div class="meta-chip-row">
-                    <span>Route: {{ item.matchResult.route }}</span>
-                    <span>Score: {{ Number(item.matchResult.similarity_score).toFixed(4) }}</span>
-                    <span>{{ item.matchResult.detector_name }}</span>
+                  <div v-if="vm.auditPayloadEntries(item.payload).length" class="ops-audit-grid">
+                    <div v-for="entry in vm.auditPayloadEntries(item.payload)" :key="entry.label" class="ops-audit-item">
+                      <span>{{ entry.label }}</span>
+                      <strong>{{ entry.value }}</strong>
+                    </div>
                   </div>
-                </div>
-                <div class="button-row">
-                  <button class="button button-primary" type="button" @click="vm.recordDecision(item, true)">Approve</button>
-                  <button class="button button-secondary" type="button" @click="vm.recordDecision(item, false)">Reject</button>
-                </div>
-              </article>
-            </div>
-            <div v-else class="empty-state">Nothing is waiting for review.</div>
-          </article>
-
-          <article class="surface-card">
-            <div class="card-heading">
-              <div><p class="kicker">Traceability</p><h3>Audit trail</h3></div>
-            </div>
-            <div v-if="vm.state.auditEvents.length" class="stack">
-              <article v-for="item in vm.state.auditEvents" :key="item.id" class="list-card">
-                <strong>{{ vm.auditActionLabel(item.action) }}</strong>
-                <div class="meta-chip-row">
-                  <span>{{ vm.statusLabel(item.entity_type) }}</span>
-                  <span :title="item.entity_id">Record updated</span>
-                  <span :title="item.actor_id">{{ vm.actorLabel(item.actor_id) }}</span>
-                  <span>{{ vm.formatDateTime(item.created_at) }}</span>
-                </div>
-                <div v-if="vm.auditPayloadEntries(item.payload).length" class="audit-entry-list">
-                  <div v-for="entry in vm.auditPayloadEntries(item.payload)" :key="entry.label" class="audit-entry">
-                    <span class="audit-entry-label">{{ entry.label }}</span>
-                    <strong class="audit-entry-value">{{ entry.value }}</strong>
-                  </div>
-                </div>
-                <pre v-else>{{ vm.auditPayloadText(item.payload) }}</pre>
-              </article>
-            </div>
-            <div v-else class="empty-state">No audit events recorded yet.</div>
-          </article>
-        </section>
-      </template>
-    </main>
+                  <pre v-else class="ops-pre">{{ vm.auditPayloadText(item.payload) }}</pre>
+                </article>
+              </div>
+              <div v-else class="ops-empty-state">
+                <strong>No audit events yet.</strong>
+                <p>Audit records will appear as the system state changes.</p>
+              </div>
+            </article>
+          </section>
+        </template>
+      </main>
+    </div>
   </div>
 </template>

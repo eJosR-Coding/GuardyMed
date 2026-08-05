@@ -7,72 +7,96 @@ const vm = props.vm;
 </script>
 
 <template>
-  <div class="auth-shell">
-    <section class="auth-hero">
-      <p class="brand-mark">GuardyMed</p>
-      <h1>Shift operations for healthcare teams</h1>
-      <p class="muted-copy auth-copy">
-        Sign in as manager or worker, then move through the product one task at a time instead of one overloaded dashboard.
-      </p>
+  <div class="auth-shell auth-shell-redesigned">
+    <section class="auth-brand-panel">
+      <div class="auth-brand-top">
+        <div class="auth-brand-mark">
+          <span class="auth-brand-glyph">G</span>
+          <div>
+            <strong>GuardyMed</strong>
+            <small>Healthcare operations platform</small>
+          </div>
+        </div>
+      </div>
 
-      <div class="auth-role-grid">
-        <article class="auth-role-card">
-          <span class="kicker">Manager</span>
-          <h3>Run the month</h3>
-          <p>Create the schedule, prepare attendance, and close operational review.</p>
-          <ol class="auth-steps">
-            <li>Load demo data</li>
-            <li>Sign in as manager</li>
-            <li>Open scheduling, attendance, or review</li>
-          </ol>
+      <div class="auth-brand-copy">
+        <p class="auth-brand-label">Internal workforce operations</p>
+        <h1>Scheduling, attendance, and operational review in one system.</h1>
+        <p>
+          GuardyMed helps hospital teams coordinate monthly shifts, verify attendance, review exceptions,
+          and keep traceable operational evidence in one workflow.
+        </p>
+
+        <div class="auth-ledger">
+          <div class="auth-ledger-step done"><span></span><b>Draft</b></div>
+          <div class="auth-ledger-step done"><span></span><b>Review</b></div>
+          <div class="auth-ledger-step active"><span></span><b>Operate</b></div>
+          <div class="auth-ledger-step"><span></span><b>Export</b></div>
+        </div>
+      </div>
+
+      <div class="auth-role-panels">
+        <article class="auth-role-panel">
+          <h3>Manager workspace</h3>
+          <p>Prepare the month, manage attendance readiness, and close review decisions.</p>
+          <ul>
+            <li>Create departments, workers, periods, and assignments</li>
+            <li>Enroll attendance and face-verification readiness</li>
+            <li>Resolve review queue items and exports</li>
+          </ul>
           <button class="button button-ghost" type="button" @click="vm.applyDemoAccount('manager')">Use manager demo</button>
         </article>
 
-        <article class="auth-role-card">
-          <span class="kicker">Worker</span>
-          <h3>Handle assigned work</h3>
-          <p>See your shifts, submit attendance evidence, and request changes if the shift is wrong.</p>
-          <ol class="auth-steps">
-            <li>Load demo data</li>
-            <li>Sign in as worker</li>
-            <li>Open schedule, attendance, or requests</li>
-          </ol>
+        <article class="auth-role-panel">
+          <h3>Worker workspace</h3>
+          <p>Check assigned shifts, submit attendance evidence, and request schedule corrections.</p>
+          <ul>
+            <li>See upcoming assigned work clearly</li>
+            <li>Submit check-in or check-out attempts</li>
+            <li>Track request and attendance status</li>
+          </ul>
           <button class="button button-ghost" type="button" @click="vm.applyDemoAccount('worker')">Use worker demo</button>
         </article>
       </div>
     </section>
 
-    <section class="auth-panel surface-card">
-      <div class="card-heading">
-        <div>
-          <p class="kicker">Access</p>
-          <h3>Sign in</h3>
+    <section class="auth-access-panel">
+      <div class="auth-access-card">
+        <div class="auth-access-head">
+          <div>
+            <h2>Sign in</h2>
+            <p>Use the seeded demo accounts or your local credentials.</p>
+          </div>
+          <span class="ops-status-chip neutral">{{ vm.currentRole.value }}</span>
         </div>
-        <span class="pill">{{ vm.currentRole.value }}</span>
-      </div>
 
-      <form class="stack" @submit.prevent="vm.login">
-        <label>
-          <span>Email</span>
-          <input v-model="vm.state.forms.login.email" type="email" />
-        </label>
-        <label>
-          <span>Password</span>
-          <input v-model="vm.state.forms.login.password" type="password" />
-        </label>
-        <button class="button button-primary" type="submit">Log in</button>
-        <button class="button button-secondary" type="button" @click="vm.bootstrapDemo">Load demo data</button>
-      </form>
+        <form class="ops-form-stack" @submit.prevent="vm.login">
+          <label class="ops-field">
+            <span>Email</span>
+            <input v-model="vm.state.forms.login.email" type="email" placeholder="name@guardymed.local" />
+          </label>
 
-      <div class="auth-helper-list">
-        <article>
-          <strong>What happens after login?</strong>
-          <p>Managers enter a control workspace. Workers enter a personal workspace.</p>
-        </article>
-        <article>
-          <strong>Need the demo accounts?</strong>
-          <p>Use the role buttons or load demo data first to seed both accounts.</p>
-        </article>
+          <label class="ops-field">
+            <span>Password</span>
+            <input v-model="vm.state.forms.login.password" type="password" placeholder="password123" />
+          </label>
+
+          <div class="auth-access-actions">
+            <button class="button button-primary" type="submit">Log in</button>
+            <button class="button button-secondary" type="button" @click="vm.bootstrapDemo">Load demo data</button>
+          </div>
+        </form>
+
+        <div class="auth-access-help">
+          <article>
+            <strong>Seeded accounts</strong>
+            <p>manager@guardymed.local and worker@guardymed.local use password123 after demo bootstrap.</p>
+          </article>
+          <article>
+            <strong>What happens after login?</strong>
+            <p>Managers enter the operational console. Workers enter the personal shift and attendance workspace.</p>
+          </article>
+        </div>
       </div>
     </section>
   </div>
