@@ -1,5 +1,7 @@
 # GuardyMed
 
+Version: `0.1.1`
+
 ## Overview
 
 GuardyMed is a healthcare workforce operations MVP focused on monthly shift scheduling, worker self-service flows, approval workflows, attendance scaffolding, auditability, and operational exports.
@@ -66,12 +68,14 @@ This keeps Phase A simple while preserving clear boundaries for later AI and CV 
 
 The next planned AI boundary is face-recognition attendance only. The current MVP does not implement CV yet; it prepares the workflow and data boundaries for that future module.
 
-## C4 Diagrams
+## Phase Status
 
-This README keeps only the product and workflow view.
+This repository should be read as:
 
-- System context, containers, and components: see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- CV attendance internals: see [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md)
+- `Phase 1 complete`
+- portfolio-grade MVP
+- not a finished production product
+- ready for demo, walkthrough, and architecture discussion
 
 ## User and System Flows
 
@@ -171,6 +175,9 @@ Local development runs as a single FastAPI process.
 - API docs: `/docs`
 - mounted app: `/app`
 - health check: `/health`
+- frontend dev server: `http://127.0.0.1:5173/`
+
+The production-style local build is served from FastAPI under `/app`.
 
 ## Demo Accounts
 
@@ -185,6 +192,7 @@ Local development runs as a single FastAPI process.
 - SQLite by default for local development
 - Vue 3
 - Vite
+- PrimeVue
 - pytest
 
 ## Domain Model
@@ -257,6 +265,33 @@ Implemented endpoints:
 - `POST /schedule-periods/{period_id}/exports`
 - `GET /schedule-periods/{period_id}/exports`
 - `GET /exports/{export_id}`
+
+## Local Run
+
+Backend:
+
+```bash
+uv run uvicorn apps.api.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Frontend dev:
+
+```bash
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+Production-style local UI:
+
+- `http://127.0.0.1:8000/app`
+
+## Release Notes — v0.1.1
+
+- stabilized manager and worker demo flows
+- improved review queue readability
+- simplified audit trail presentation
+- reduced raw internal IDs in the UI
+- improved attendance enrollment guards
+- fixed FastAPI-mounted frontend asset paths under `/app`
 
 Quick local run:
 
