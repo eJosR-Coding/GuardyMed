@@ -33,7 +33,8 @@ It currently includes:
 - a production-style build served by FastAPI under `/app`
 - cookie-backed session flows for manager and worker
 - scheduling, change request, review, audit, export, and attendance endpoints
-- a browser-based face-enrollment and face-verification demo path
+- a browser-based face-enrollment and face-verification flow
+- a dedicated backend computer-vision attendance module with real and stub runtimes
 - architecture and AI/CV design notes for the next hardening stage
 
 ## Solution Direction
@@ -67,7 +68,7 @@ Current implementation is a modular monolith:
 
 This keeps the MVP simple while preserving clear boundaries for the attendance CV module.
 
-The AI scope is intentionally narrow: face-verification for attendance. The current MVP already exposes enrollment and verification demo flows, but it is not yet a hardened production CV pipeline.
+The AI scope is intentionally narrow: face-verification for attendance. The current MVP already includes a real backend CV module, enrollment and verification workflows, similarity routing, and tests. It does not claim a production-hardened biometric pipeline yet, but it does provide a real production path through InsightFace/OpenCV while keeping a stub runtime as the default local mode.
 
 ## Phase Status
 
@@ -216,6 +217,10 @@ The production-style local build is served directly from FastAPI under `/app`.
 - Vue 3
 - Vite
 - PrimeVue
+- NumPy
+- OpenCV (optional CV runtime path)
+- ONNX Runtime (optional CV runtime path)
+- InsightFace (optional CV runtime path)
 - pytest
 
 ## What Works Today
@@ -231,6 +236,77 @@ The production-style local build is served directly from FastAPI under `/app`.
 - audit trail inspection
 - monthly export generation
 - face enrollment and face-verification demo endpoints
+
+## CV Module Status
+
+The attendance computer-vision module already exists in the backend and is not just a UI placeholder.
+
+What exists today:
+
+- a dedicated attendance CV domain module in the backend
+- an optional real runtime using InsightFace + OpenCV + ONNX Runtime
+- a deterministic stub runtime used by default for demo-safe local development
+- enrollment and verification workflows
+- similarity-based routing to `accept`, `review`, or `reject`
+- API coverage and automated tests for the CV flow
+
+Important boundary:
+
+- the default local setting is `attendance_cv_runtime = "stub"`
+- the real runtime is available as the production-path integration, not the default demo mode
+- this means the MVP can honestly present a CV attendance verification module without overstating it as a hardened biometric production system
+
+## CV Verification Pipeline
+
+The current CV flow is small on purpose: one enrollment template, one verification attempt, one similarity score, and one routing decision.
+
+### Current runtime model
+
+- default runtime: deterministic stub for local demo and tests
+- optional runtime: InsightFace embedding extraction through OpenCV image decoding and ONNX Runtime-backed inference
+
+### InsightFace/OpenCV verification path
+
+```mermaid
+flowchart TD
+    A[Worker or manager submits image] --> B[API receives base64 media]
+    B --> C[OpenCV decodes image bytes]
+    C --> D[InsightFace FaceAnalysis detects face]
+    D --> E{Face found?}
+    E -->|No| F[Return face_detected false]
+    E -->|Yes| G[Select largest face]
+    G --> H[Extract embedding]
+    H --> I[Normalize embedding vector]
+    I --> J[Compare with enrolled template]
+    J --> K[Compute similarity score]
+    K --> L{Threshold route}
+    L -->|>= accept threshold| M[Accept]
+    L -->|between review and accept| N[Manual review]
+    L -->|< review threshold| O[Reject]
+    M --> P[Persist attempt and match result]
+    N --> P
+    O --> P
+```
+
+### MVP CV decision model
+
+- enrollment stores one reference embedding for the worker
+- verification extracts one probe embedding from the submitted image
+- cosine similarity is compared against two thresholds:
+  - accept threshold
+  - review threshold
+- the result is routed to:
+  - `accepted`
+  - `pending review`
+  - `rejected`
+
+This is enough for a portfolio MVP because it demonstrates:
+
+- a real CV module boundary
+- a real runtime option
+- deterministic local fallback
+- a complete enrollment-to-verification workflow
+- review routing integrated with the healthcare operations product
 
 ## Domain Model
 
