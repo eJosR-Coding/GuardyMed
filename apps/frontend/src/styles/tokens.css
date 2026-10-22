@@ -1,0 +1,44 @@
+/* Design tokens. One accent (clinical teal); green/amber/red are reserved for status. */
+@import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-500.css";
+@import "@fontsource/ibm-plex-sans/latin-600.css";
+
+:root {
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --bg: #f5f7f7;
+  --surface: #ffffff;
+  --surface-sunken: #eef2f2;
+  --line: #dfe5e6;
+  --line-strong: #c5cfd1;
+
+  --text: #15252b;
+  --text-muted: #55666d;
+  --text-faint: #6f7f86;
+
+  --accent: #0f766e;
+  --accent-hover: #0b5f58;
+  --accent-tint: #e4f2f0;
+  --on-accent: #ffffff;
+
+  --ok: #166534;
+  --ok-tint: #e5f4e9;
+  --warn: #8a4b08;
+  --warn-tint: #fcf0dc;
+  --bad: #a62a1f;
+  --bad-tint: #fbe9e6;
+  --neutral-tint: #e9eeef;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow: 0 1px 2px rgba(21, 37, 43, 0.06), 0 4px 16px rgba(21, 37, 43, 0.05);
+  --focus: 0 0 0 3px rgba(15, 118, 110, 0.35);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+}

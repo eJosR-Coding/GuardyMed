@@ -1,7 +1,7 @@
 {
   "name": "guardymed-frontend",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,9 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@primevue/themes": "^4.5.4",
-    "primeicons": "^8.0.0",
-    "primevue": "^4.5.5",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
     "vue": "3.5.40"
   },
   "devDependencies": {
