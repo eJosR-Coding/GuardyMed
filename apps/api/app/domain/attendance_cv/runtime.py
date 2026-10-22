@@ -90,7 +90,7 @@ class DeterministicFaceEmbeddingRuntime:
 class InsightFaceEmbeddingRuntime:
     kind = "insightface"
     is_demo = False
-    detector_name = "insightface-retinaface"
+    detector_name = "insightface-scrfd"
 
     def __init__(self, *, model_name: str = "buffalo_l", min_quality: float = 0.5, model_root: str | None = None) -> None:
         try:
