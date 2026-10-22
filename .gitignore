@@ -21,3 +21,5 @@ apps/frontend/dist/
 legacy/django-demo/db.sqlite3
 legacy/django-demo/__pycache__/
 legacy/django-demo/guardymed.egg-info/
+
+.codegraph/
