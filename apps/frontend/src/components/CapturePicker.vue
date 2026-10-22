@@ -62,7 +62,7 @@ onBeforeUnmount(stopCamera);
       <div>
         <strong>Demo runtime, not real face recognition.</strong>
         <span v-if="cv.fallback_reason"> The real model could not start, so GuardyMed fell back to the demo runtime.</span>
-        Pick a simulated capture below to see each outcome. A real photo is only compared byte-for-byte.
+        Pick a simulated capture below to see each outcome. A real photo is not analysed: it gets an unrelated, effectively random score.
       </div>
     </div>
 

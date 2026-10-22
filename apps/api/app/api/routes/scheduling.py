@@ -589,7 +589,8 @@ async def get_export(
 
 
 def _demo_captures(worker_id: str, *, accept: float, review: float) -> list[DemoCaptureRead]:
-    """Simulated captures for the demo runtime. They carry no face: the stub reads the requested cosine from the payload."""
+    """Simulated captures for the demo runtime. They carry no face: the stub reads the requested cosine from the payload
+    (the "different person" is simply a near-orthogonal embedding, so the demo outcome never depends on chance)."""
     import base64
 
     def encode(identity: str, cosine: float) -> str:
@@ -600,7 +601,7 @@ def _demo_captures(worker_id: str, *, accept: float, review: float) -> list[Demo
         DemoCaptureRead(id="enroll", label="Reference photo", expected_outcome="verified", media_base64=encode(worker_id, 1.0)),
         DemoCaptureRead(id="clear", label="Clear capture of the same person", expected_outcome="verified", media_base64=encode(worker_id, 0.9)),
         DemoCaptureRead(id="borderline", label="Poor lighting, same person", expected_outcome="needs_review", media_base64=encode(worker_id, borderline)),
-        DemoCaptureRead(id="stranger", label="A different person", expected_outcome="not_verified", media_base64=encode("stranger-at-the-door", 1.0)),
+        DemoCaptureRead(id="stranger", label="A different person", expected_outcome="not_verified", media_base64=encode(worker_id, 0.05)),
     ]
 
 

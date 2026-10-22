@@ -3,7 +3,7 @@
 Two implementations share one protocol:
 
 * ``DeterministicFaceEmbeddingRuntime`` ("stub") needs no ML dependencies. It does **not** recognise
-  faces: it hashes the uploaded bytes (identical bytes -> identical embedding) and understands a tiny
+  faces: it hashes the uploaded bytes into a pseudo-random embedding (identical bytes -> identical embedding) and understands a tiny
   simulation protocol, ``GMDEMO:<identity>:<cosine>``, so the demo can show all three outcomes.
 * ``InsightFaceEmbeddingRuntime`` runs the real detector + ArcFace-style recogniser through ONNX Runtime.
 """

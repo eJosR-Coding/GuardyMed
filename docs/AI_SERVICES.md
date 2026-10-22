@@ -31,7 +31,7 @@ Thresholds are environment variables: `GUARDYMED_ATTENDANCE_CV_ACCEPT_THRESHOLD`
 | | Demo runtime (`stub`, default) | Real runtime (`insightface`) |
 | --- | --- | --- |
 | Dependencies | none | `uv sync --extra cv` (NumPy, OpenCV headless, ONNX Runtime, InsightFace) |
-| Recognises faces | **No.** Hashes the bytes; identical bytes match, anything else does not | Yes: SCRFD detector + ResNet-50 ArcFace (`buffalo_l`), CPU |
+| Recognises faces | **No.** Hashes the bytes; identical bytes match, anything else gets an unrelated random-looking score | Yes: SCRFD detector + ResNet-50 ArcFace (`buffalo_l`), CPU |
 | Purpose | Show the workflow and all three outcomes without ML packages | Actual verification |
 | Demo captures | `GMDEMO:<identity>:<cosine>` payloads produce a chosen similarity (used by the UI's sample buttons) | not used |
 
