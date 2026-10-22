@@ -33,6 +33,7 @@ from apps.api.app.domain.scheduling.rules import (
     SYSTEM_ACTOR_ID,
     AuditAction,
     build_export_lines,
+    build_export_table,
     ensure_no_assignment_overlap,
     ensure_unique_department_code,
     ensure_unique_schedule_period,
@@ -45,6 +46,7 @@ from apps.api.app.domain.scheduling.rules import (
     validate_change_request_status_transition,
     validate_exportable_period,
     validate_month,
+    validate_shift_date_in_period,
     validate_time_window,
     require_active_attendance_enrollment,
     require_pending_attendance_attempt,
@@ -188,6 +190,7 @@ class SchedulingService:
         if worker.department_id != period.department_id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="worker does not belong to the schedule department")
         validate_schedule_period_editable(period.status)
+        validate_shift_date_in_period(shift_date=shift_date, year=period.year, month=period.month)
         validate_time_window(start_time=start_time, end_time=end_time)
         overlaps = any(
             item.shift_date == shift_date and start_time < item.end_time and end_time > item.start_time
@@ -434,87 +437,10 @@ class SchedulingService:
         exports.sort(key=lambda item: item.created_at)
         return exports
 
-    def seed_demo_data(self) -> dict[str, int | bool]:
-        if self.repository.list_departments():
-            return {
-                "seeded": False,
-                "departments": len(self.repository.list_departments()),
-                "workers": len(self.repository.list_workers()),
-                "periods": len(self.repository.list_periods()),
-                "assignments": sum(len(self.repository.list_assignments_for_period(item.id)) for item in self.repository.list_periods()),
-                "change_requests": len(self.repository.list_change_requests()),
-            }
+    def seed_demo_data(self, today: date | None = None) -> dict[str, int | bool]:
+        from apps.api.app.domain.scheduling import demo_seed
 
-        department = self.create_department(name="Emergency", code="ER")
-        worker_1 = self.create_worker(
-            full_name="Ana Ruiz",
-            document_id="10010010",
-            worker_type="Nurse",
-            department_id=department.id,
-        )
-        worker_2 = self.create_worker(
-            full_name="Luis Torres",
-            document_id="20020020",
-            worker_type="Doctor",
-            department_id=department.id,
-        )
-        worker_3 = self.create_worker(
-            full_name="Marta Vega",
-            document_id="30030030",
-            worker_type="Nurse",
-            department_id=department.id,
-        )
-        period = self.create_period(year=2026, month=8, department_id=department.id, created_by="coord_demo")
-        assignment_1 = self.create_assignment(
-            period_id=period.id,
-            worker_id=worker_1.id,
-            assignment_type=AssignmentType.GUARD_SHIFT,
-            shift_date=date(2026, 8, 4),
-            start_time=time(8, 0),
-            end_time=time(20, 0),
-            notes="Emergency daytime coverage",
-        )
-        self.create_assignment(
-            period_id=period.id,
-            worker_id=worker_2.id,
-            assignment_type=AssignmentType.SHIFT_LEAD,
-            shift_date=date(2026, 8, 5),
-            start_time=time(20, 0),
-            end_time=time(23, 59),
-            notes="Night shift lead",
-        )
-        self.create_assignment(
-            period_id=period.id,
-            worker_id=worker_3.id,
-            assignment_type=AssignmentType.ON_CALL,
-            shift_date=date(2026, 8, 6),
-            start_time=time(8, 0),
-            end_time=time(18, 0),
-            notes="Backup coverage",
-        )
-        self.create_change_request(
-            assignment_id=assignment_1.id,
-            requested_by=worker_1.id,
-            request_type=ChangeRequestType.ADJUSTMENT,
-            reason="Medical appointment overlap",
-            replacement_worker_id=worker_3.id,
-        )
-        self.create_attendance_enrollment(worker_id=worker_1.id, created_by="coord_demo")
-        self.create_attendance_attempt(
-            worker_id=worker_1.id,
-            assignment_id=assignment_1.id,
-            attempt_type=AttendanceAttemptType.CHECK_IN,
-            evidence_ref="manual://demo-check-in",
-        )
-
-        return {
-            "seeded": True,
-            "departments": 1,
-            "workers": 3,
-            "periods": 1,
-            "assignments": 3,
-            "change_requests": 1,
-        }
+        return demo_seed.seed(self, today)
 
     def create_attendance_enrollment(self, *, worker_id: str, created_by: str) -> AttendanceEnrollment:
         self._require_worker(worker_id)
@@ -720,17 +646,24 @@ class SchedulingService:
         assignments: list[ShiftAssignment],
         export_type: ExportType,
     ) -> str:
-        assignment_count = len(assignments)
-        worker_count = len({item.worker_id for item in assignments})
         lines = build_export_lines(
             export_type=export_type,
             year=period.year,
             month=period.month,
             department_id=period.department_id,
-            assignment_count=assignment_count,
-            worker_count=worker_count,
+            assignment_count=len(assignments),
+            worker_count=len({item.worker_id for item in assignments}),
         )
-        return "\n".join(lines)
+        latest_attempts: dict[str, AttendanceAttempt] = {}
+        for attempt in sorted(self.repository.list_attendance_attempts(), key=lambda item: item.attempted_at):
+            latest_attempts[attempt.assignment_id] = attempt
+        table = build_export_table(
+            export_type=export_type,
+            assignments=assignments,
+            workers={item.id: item for item in self.repository.list_workers()},
+            latest_attempts=latest_attempts,
+        )
+        return "\n".join(lines) + "\n\n" + table
 
     @staticmethod
     def _new_id(prefix: str) -> str:

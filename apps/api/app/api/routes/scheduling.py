@@ -42,6 +42,7 @@ from apps.api.app.api.routes.scheduling_models import (
     WorkerRead,
 )
 from apps.api.app.domain.attendance_cv.bootstrap import workflow as attendance_cv_workflow
+from apps.api.app.core.config import settings
 from apps.api.app.core.errors import ApiError
 from apps.api.app.domain.scheduling import service
 
@@ -78,6 +79,8 @@ async def attendance_capabilities() -> dict[str, object]:
 async def seed_demo_data(
     _: AuthContext = Depends(require_roles(UserRole.MANAGER)),
 ) -> DemoSeedRead:
+    if not settings.demo_mode:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "demo mode is disabled", code="not_found")
     return DemoSeedRead.model_validate(service.seed_demo_data())
 
 

@@ -419,32 +419,70 @@ def test_create_and_fetch_export_for_approved_period() -> None:
     assert len(period_exports) == 1
 
 
-def test_seed_demo_data_is_idempotent() -> None:
+def test_seed_demo_data_is_idempotent_and_relative_to_today() -> None:
     service = build_service()
+    today = date(2026, 10, 22)
 
-    first = service.seed_demo_data()
-    second = service.seed_demo_data()
+    first = service.seed_demo_data(today)
+    second = service.seed_demo_data(today)
 
     assert first["seeded"] is True
     assert first["departments"] == 1
-    assert first["workers"] == 3
-    assert first["periods"] == 1
-    assert first["assignments"] == 3
+    assert first["workers"] == 5
+    assert first["periods"] == 2
+    assert first["assignments"] == (30 + 31) * 2  # September + October, a day and a night shift per day
     assert first["change_requests"] == 1
     assert second["seeded"] is False
-    assert second["departments"] == 1
+    assert second["periods"] == 2
+    statuses = {(item.year, item.month): item.status for item in service.list_periods()}
+    assert statuses == {(2026, 9): SchedulePeriodStatus.APPROVED, (2026, 10): SchedulePeriodStatus.DRAFT}
+
+
+def test_seed_demo_data_puts_the_demo_worker_on_shift_today() -> None:
+    service = build_service()
+    today = date(2026, 1, 15)  # also exercises the year rollover for "previous month"
+
+    service.seed_demo_data(today)
+
+    ana = next(item for item in service.list_workers() if item.full_name == "Ana Ruiz")
+    shifts_today = [item for item in service.list_assignments_for_worker(ana.id) if item.shift_date == today]
+    assert [item.start_time for item in shifts_today] == [time(8, 0)]
+    assert {(item.year, item.month) for item in service.list_periods()} == {(2025, 12), (2026, 1)}
 
 
 def test_review_queue_uses_repository_lists() -> None:
     service = build_service()
-    service.seed_demo_data()
+    service.seed_demo_data(date(2026, 10, 22))
 
-    period = service.list_periods()[0]
+    period = next(item for item in service.list_periods() if item.status == SchedulePeriodStatus.DRAFT)
     service.update_period_status(period.id, status_value=SchedulePeriodStatus.IN_REVIEW)
     queue = service.list_review_queue()
 
     assert len(queue["schedule_periods"]) == 1
     assert len(queue["change_requests"]) == 1
+
+
+def test_assignment_must_fall_inside_the_period_month() -> None:
+    service = build_service()
+    department = service.create_department(name="ICU", code="ICU")
+    worker = service.create_worker(full_name="Grace Hopper", document_id="87654321", worker_type="doctor", department_id=department.id)
+    period = service.create_period(year=2026, month=9, department_id=department.id, created_by=None)
+
+    try:
+        service.create_assignment(
+            period_id=period.id,
+            worker_id=worker.id,
+            assignment_type=AssignmentType.GUARD_SHIFT,
+            shift_date=date(2026, 10, 1),
+            start_time=time(8, 0),
+            end_time=time(16, 0),
+            notes=None,
+        )
+    except Exception as exc:  # ponytail: FastAPI HTTPException is enough until domain errors exist
+        assert getattr(exc, "status_code", None) == 422
+        assert getattr(exc, "detail", None) == "shift_date must fall inside 2026-09"
+    else:
+        raise AssertionError("expected assignment creation to fail")
 
 
 def test_export_requires_approved_period() -> None:

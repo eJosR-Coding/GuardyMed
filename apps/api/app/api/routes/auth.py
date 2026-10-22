@@ -17,6 +17,7 @@ from apps.api.app.api.auth import (
     set_session_cookie,
     verify_password,
 )
+from apps.api.app.core.config import settings
 from apps.api.app.domain.scheduling import service as scheduling_service
 from apps.api.app.domain.scheduling.entities import Worker
 from apps.api.app.api.auth import create_user
@@ -54,6 +55,8 @@ class DemoBootstrapRead(BaseModel):
 
 @router.post("/bootstrap-demo", response_model=DemoBootstrapRead)
 async def bootstrap_demo() -> DemoBootstrapRead:
+    if not settings.demo_mode:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="demo mode is disabled")
     try:
         seed_result = scheduling_service.seed_demo_data()
     except HTTPException as exc:

@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import csv
+import io
+from collections import defaultdict
+from datetime import datetime
+
 from fastapi import HTTPException, status
 
 from apps.api.app.domain.scheduling.entities import (
@@ -45,6 +50,14 @@ def validate_time_window(*, start_time, end_time) -> None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="end_time must be after start_time",
+        )
+
+
+def validate_shift_date_in_period(*, shift_date, year: int, month: int) -> None:
+    if (shift_date.year, shift_date.month) != (year, month):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"shift_date must fall inside {year}-{month:02d}",
         )
 
 
@@ -188,6 +201,71 @@ def build_export_lines(
         f"assignments={assignment_count}",
         f"workers={worker_count}",
     ]
+
+
+def _csv(rows: list[list[object]]) -> str:
+    buffer = io.StringIO()
+    csv.writer(buffer, lineterminator="\n").writerows(rows)
+    return buffer.getvalue().rstrip("\n")
+
+
+def _hours(assignment) -> float:
+    start = datetime.combine(assignment.shift_date, assignment.start_time)
+    end = datetime.combine(assignment.shift_date, assignment.end_time)
+    return (end - start).total_seconds() / 3600
+
+
+def build_export_table(*, export_type: ExportType, assignments, workers: dict, latest_attempts: dict) -> str:
+    """CSV body of an export. ``workers`` maps id -> Worker, ``latest_attempts`` maps assignment id -> latest attempt."""
+    ordered = sorted(assignments, key=lambda item: (item.shift_date, item.start_time, item.worker_id))
+
+    def name(worker_id: str) -> str:
+        worker = workers.get(worker_id)
+        return worker.full_name if worker else worker_id
+
+    if export_type == ExportType.PAYROLL_SUMMARY:
+        totals: dict[str, list[float]] = defaultdict(lambda: [0, 0.0])
+        for item in ordered:
+            totals[item.worker_id][0] += 1
+            totals[item.worker_id][1] += _hours(item)
+        rows: list[list[object]] = [["worker", "worker_type", "shifts", "hours"]]
+        for worker_id in sorted(totals, key=name):
+            worker = workers.get(worker_id)
+            rows.append([name(worker_id), worker.worker_type if worker else "", int(totals[worker_id][0]), f"{totals[worker_id][1]:.2f}"])
+        return _csv(rows)
+
+    if export_type == ExportType.COMPLIANCE_REPORT:
+        rows = [["date", "start", "end", "worker", "attendance", "decided_by", "review_reason"]]
+        for item in ordered:
+            attempt = latest_attempts.get(item.id)
+            rows.append(
+                [
+                    item.shift_date.isoformat(),
+                    item.start_time.strftime("%H:%M"),
+                    item.end_time.strftime("%H:%M"),
+                    name(item.worker_id),
+                    attempt.decision_status.value if attempt else "no_record",
+                    (attempt.decided_by or "") if attempt else "",
+                    (attempt.review_reason or "") if attempt else "",
+                ]
+            )
+        return _csv(rows)
+
+    rows = [["date", "start", "end", "worker", "role", "assignment_type", "notes"]]
+    for item in ordered:
+        worker = workers.get(item.worker_id)
+        rows.append(
+            [
+                item.shift_date.isoformat(),
+                item.start_time.strftime("%H:%M"),
+                item.end_time.strftime("%H:%M"),
+                name(item.worker_id),
+                worker.worker_type if worker else "",
+                item.assignment_type.value,
+                item.notes or "",
+            ]
+        )
+    return _csv(rows)
 
 
 def require_active_attendance_enrollment(is_active: bool) -> None:
