@@ -18,6 +18,7 @@ from apps.api.app.api.auth import (
     verify_password,
 )
 from apps.api.app.core.config import settings
+from apps.api.app.domain.attendance_cv.bootstrap import ensure_demo_face_enrollment
 from apps.api.app.domain.scheduling import service as scheduling_service
 from apps.api.app.domain.scheduling.entities import Worker
 from apps.api.app.api.auth import create_user
@@ -92,6 +93,8 @@ async def bootstrap_demo() -> DemoBootstrapRead:
         worker_id=worker.id,
         department_id=worker.department_id,
     )
+
+    ensure_demo_face_enrollment(worker.id)
 
     return DemoBootstrapRead(
         seeded=seed_result["seeded"] or not created_before,

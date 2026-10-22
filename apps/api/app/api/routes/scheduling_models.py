@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
+from apps.api.app.domain.attendance_cv.entities import OUTCOME_BY_ROUTE, FaceReviewRoute
 from apps.api.app.domain.scheduling.entities import AssignmentType, SchedulePeriodStatus
 from apps.api.app.domain.scheduling.entities import (
     ApprovalDecisionType,
@@ -353,6 +354,10 @@ class FaceEnrollmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+def _is_stub_model(model_name: str) -> bool:
+    return model_name.startswith("stub-")
+
+
 class FaceTemplateRead(BaseModel):
     id: str
     enrollment_id: str
@@ -363,6 +368,11 @@ class FaceTemplateRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def is_demo_runtime(self) -> bool:
+        return _is_stub_model(self.model_name)
 
 
 class FaceEnrollmentBundleRead(BaseModel):
@@ -398,7 +408,41 @@ class AttendanceMatchResultRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @computed_field
+    @property
+    def outcome(self) -> str:
+        """verified / needs_review / not_verified: the product-level reading of ``route``."""
+        return OUTCOME_BY_ROUTE[FaceReviewRoute(self.route)].value
+
+    @computed_field
+    @property
+    def is_demo_runtime(self) -> bool:
+        return _is_stub_model(self.model_name)
+
 
 class FaceVerificationRead(BaseModel):
     attempt: AttendanceAttemptRead
     match_result: AttendanceMatchResultRead
+
+
+class DemoCaptureRead(BaseModel):
+    id: str
+    label: str
+    expected_outcome: str
+    media_base64: str
+
+
+class FaceRuntimeStatusRead(BaseModel):
+    runtime: str
+    requested_runtime: str
+    is_demo: bool
+    fallback_reason: str | None
+    model_name: str
+    detector_name: str
+    threshold_accept: float
+    threshold_review: float
+    # For the worker in scope: whether a face template exists, so the UI can guide enrolment.
+    worker_id: str | None = None
+    enrolled: bool = False
+    # Only populated by the demo runtime: ready-made captures that exercise each outcome.
+    demo_captures: list[DemoCaptureRead] = []

@@ -3,8 +3,9 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
+from fastapi import status
 
+from apps.api.app.core.errors import ApiError
 from apps.api.app.domain.attendance_cv.entities import (
     FaceEmbeddingResult,
     FaceEnrollmentTemplate,
@@ -15,15 +16,21 @@ from apps.api.app.domain.attendance_cv.entities import (
 from apps.api.app.domain.attendance_cv.protocols import FaceEmbeddingRuntime
 from apps.api.app.domain.attendance_cv.runtime import DeterministicFaceEmbeddingRuntime
 
+_FAILURE_MESSAGES = {
+    "low_quality": ("face_low_quality", "The face in the image is too unclear to use. Retake the photo in better light, facing the camera."),
+}
+
 
 class AttendanceCVService:
     def __init__(
         self,
         runtime: FaceEmbeddingRuntime | None = None,
         *,
-        threshold_accept: float = 0.92,
-        threshold_review: float = 0.75,
+        threshold_accept: float = 0.45,
+        threshold_review: float = 0.30,
     ) -> None:
+        if threshold_review > threshold_accept:
+            raise ValueError("review threshold cannot be above the accept threshold")
         self.runtime = runtime or DeterministicFaceEmbeddingRuntime()
         self.threshold_accept = threshold_accept
         self.threshold_review = threshold_review
@@ -50,10 +57,21 @@ class AttendanceCVService:
         enrollment_template: FaceEnrollmentTemplate,
         media_bytes: bytes,
     ) -> FaceMatchDecision:
+        if enrollment_template.model_name != self.runtime.model_name:
+            raise ApiError(
+                status.HTTP_409_CONFLICT,
+                "The enrolled face was captured with a different recognition model. Ask a manager to enroll it again.",
+                code="template_model_mismatch",
+            )
         result = self._embed_or_raise(media_bytes)
         assert result.embedding is not None
         score = self.cosine_similarity(enrollment_template.embedding, result.embedding)
         route = self.route_similarity(score)
+        notes: list[str] = []
+        if route == FaceReviewRoute.ACCEPT and result.face_count > 1:
+            # Never auto-accept when the frame is ambiguous: a person has to look at it.
+            route = FaceReviewRoute.REVIEW
+            notes.append(f"{result.face_count} faces were visible; the largest was compared")
         return FaceMatchDecision(
             worker_id=worker_id,
             assignment_id=assignment_id,
@@ -63,6 +81,7 @@ class AttendanceCVService:
             threshold_review=self.threshold_review,
             detector_name=result.detector_name,
             model_name=result.model_name,
+            notes=tuple(notes),
         )
 
     def route_similarity(self, similarity_score: float) -> FaceReviewRoute:
@@ -83,9 +102,10 @@ class AttendanceCVService:
 
     def _embed_or_raise(self, media_bytes: bytes) -> FaceEmbeddingResult:
         result = self.runtime.embed(media_bytes)
-        if not result.face_detected or result.embedding is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail="face could not be extracted from media",
-            )
-        return result
+        if result.face_detected and result.embedding is not None:
+            return result
+        code, message = _FAILURE_MESSAGES.get(
+            result.failure or "",
+            ("face_not_detected", "face could not be extracted from media"),
+        )
+        raise ApiError(status.HTTP_422_UNPROCESSABLE_CONTENT, message, code=code)

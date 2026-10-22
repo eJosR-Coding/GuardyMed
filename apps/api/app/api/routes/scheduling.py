@@ -11,6 +11,8 @@ from apps.api.app.api.routes.scheduling_models import (
     AttendanceEnrollmentCreate,
     AttendanceEnrollmentRead,
     AuditEventRead,
+    DemoCaptureRead,
+    FaceRuntimeStatusRead,
     ColleagueRead,
     ChangeRequestCreate,
     ChangeRequestListRead,
@@ -41,7 +43,9 @@ from apps.api.app.api.routes.scheduling_models import (
     WorkerCreate,
     WorkerRead,
 )
+from apps.api.app.domain.attendance_cv.bootstrap import runtime_status as attendance_cv_runtime_status
 from apps.api.app.domain.attendance_cv.bootstrap import workflow as attendance_cv_workflow
+from apps.api.app.domain.attendance_cv.runtime import demo_capture
 from apps.api.app.core.config import settings
 from apps.api.app.core.errors import ApiError
 from apps.api.app.domain.scheduling import service
@@ -73,6 +77,28 @@ async def attendance_capabilities() -> dict[str, object]:
         "phase": "phase-1-cv-scaffold",
         "modules": ["enrollments", "attempts", "manual-review", "face-enrollment", "face-verification"],
     }
+
+
+@router.get("/attendance/cv/status", response_model=FaceRuntimeStatusRead)
+async def face_runtime_status(
+    worker_id: str | None = None,
+    auth: AuthContext = Depends(get_auth_context),
+) -> FaceRuntimeStatusRead:
+    """Which recognition runtime is active (real or demo), its thresholds, and enrolment state for one worker."""
+    if auth.role == UserRole.WORKER:
+        worker_id = _require_worker_identity(auth)
+    elif worker_id is not None:
+        _require_department_access(auth, _worker_department_id(worker_id))
+    info = attendance_cv_runtime_status()
+    captures: list[DemoCaptureRead] = []
+    if info["is_demo"] and worker_id is not None:
+        captures = _demo_captures(worker_id, accept=float(info["threshold_accept"]), review=float(info["threshold_review"]))
+    return FaceRuntimeStatusRead(
+        **info,
+        worker_id=worker_id,
+        enrolled=bool(worker_id) and attendance_cv_workflow.has_face_template(worker_id),
+        demo_captures=captures,
+    )
 
 
 @router.post("/demo/seed", response_model=DemoSeedRead)
@@ -545,6 +571,22 @@ async def get_export(
     period = service.get_period(export_job.schedule_period_id)
     _require_department_access(auth, period.department_id)
     return ExportRead.model_validate(export_job)
+
+
+def _demo_captures(worker_id: str, *, accept: float, review: float) -> list[DemoCaptureRead]:
+    """Simulated captures for the demo runtime. They carry no face: the stub reads the requested cosine from the payload."""
+    import base64
+
+    def encode(identity: str, cosine: float) -> str:
+        return base64.b64encode(demo_capture(identity, cosine)).decode("ascii")
+
+    borderline = round((accept + review) / 2, 4)
+    return [
+        DemoCaptureRead(id="enroll", label="Reference photo", expected_outcome="verified", media_base64=encode(worker_id, 1.0)),
+        DemoCaptureRead(id="clear", label="Clear capture of the same person", expected_outcome="verified", media_base64=encode(worker_id, 0.9)),
+        DemoCaptureRead(id="borderline", label="Poor lighting, same person", expected_outcome="needs_review", media_base64=encode(worker_id, borderline)),
+        DemoCaptureRead(id="stranger", label="A different person", expected_outcome="not_verified", media_base64=encode("stranger-at-the-door", 1.0)),
+    ]
 
 
 def _require_department_access(auth: AuthContext, department_id: str) -> None:

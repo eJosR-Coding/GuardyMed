@@ -14,9 +14,9 @@ def test_create_enrollment_template_returns_embedding_and_metadata() -> None:
     )
 
     assert template.worker_id == "wrk_123"
-    assert template.detector_name == "stub-face-detector"
-    assert template.model_name == "stub-arcface-embedding"
-    assert len(template.embedding.values) == 16
+    assert template.detector_name == "stub-detector"
+    assert template.model_name == "stub-simulated-embedding"
+    assert len(template.embedding.values) == 64
     assert template.quality_score > 0.0
 
 

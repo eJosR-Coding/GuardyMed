@@ -77,10 +77,22 @@ async def test_worker_can_submit_face_verification_for_own_assignment(client: As
 
 @pytest.mark.anyio
 async def test_worker_face_verification_requires_existing_face_enrollment(client: AsyncClient) -> None:
+    from apps.api.app.api.auth import UserRole, create_user
+
     await seed_and_login(client, "manager@guardymed.local")
+    workers = await client.get("/api/v1/scheduling/workers")
+    rosa = next(item for item in workers.json() if item["full_name"] == "Rosa Quispe")  # never enrolled
+    create_user(
+        email="rosa@guardymed.local",
+        full_name=rosa["full_name"],
+        password="password123",
+        role=UserRole.WORKER,
+        worker_id=rosa["id"],
+        department_id=rosa["department_id"],
+    )
     await client.post("/api/v1/auth/logout")
 
-    worker_session = await login(client, "worker@guardymed.local")
+    worker_session = await login(client, "rosa@guardymed.local")
     assignments = await client.get(f"/api/v1/scheduling/workers/{worker_session['worker_id']}/assignments")
     assert assignments.status_code == 200, assignments.text
     assignment_id = assignments.json()["items"][0]["id"]

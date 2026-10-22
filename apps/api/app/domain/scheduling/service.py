@@ -531,7 +531,7 @@ class SchedulingService:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="decision status must be accepted or rejected")
         attempt.decision_status = decision_status
         attempt.decided_by = decided_by.strip()
-        attempt.review_reason = review_reason.strip() if review_reason else None
+        attempt.review_reason = review_reason.strip() if review_reason else attempt.review_reason
         attempt.decided_at = datetime.now(timezone.utc)
         updated = self.repository.update_attendance_attempt(attempt)
         self._record_event(
@@ -542,6 +542,24 @@ class SchedulingService:
             payload={"decision_status": updated.decision_status, "assignment_id": updated.assignment_id},
         )
         return updated
+
+    def flag_attendance_attempt(self, attempt_id: str, *, review_reason: str) -> AttendanceAttempt:
+        """Attach an explanation to a pending attempt that needs a human decision (status stays pending)."""
+        attempt = self.get_attendance_attempt(attempt_id)
+        require_pending_attendance_attempt(attempt.decision_status)
+        attempt.review_reason = review_reason.strip()
+        return self.repository.update_attendance_attempt(attempt)
+
+    def record_event(
+        self,
+        *,
+        actor_id: str,
+        entity_type: str,
+        entity_id: str,
+        action: str,
+        payload: dict[str, object],
+    ) -> AuditEvent:
+        return self._record_event(actor_id=actor_id, entity_type=entity_type, entity_id=entity_id, action=action, payload=payload)
 
     def _require_department(self, department_id: str) -> Department:
         department = self.repository.get_department(department_id)
