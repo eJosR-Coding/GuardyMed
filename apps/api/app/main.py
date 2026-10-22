@@ -8,6 +8,7 @@ from apps.api.app.api.routes.auth import router as auth_router
 from apps.api.app.api.routes.health import router as health_router
 from apps.api.app.api.routes.scheduling import router as scheduling_router
 from apps.api.app.core.config import settings
+from apps.api.app.core.errors import register_error_handlers
 
 
 def create_app() -> FastAPI:
@@ -17,6 +18,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+    register_error_handlers(app)
     app.include_router(health_router)
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(scheduling_router, prefix="/api/v1")
