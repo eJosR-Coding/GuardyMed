@@ -89,9 +89,9 @@ Threshold sweep (error rates among the scored pairs):
   needs a held-out set, ideally images from the real deployment.
 - 497 impostor pairs can only show that the false-accept rate is probably below about 0.8%. A claim like "one in a thousand"
   needs thousands of impostor pairs.
-- The 4% of same-person pairs that score below 0.25 are mostly hard cases (extreme pose, age gaps, occlusion) and a few
-  label problems that are known in LFW. The review band is nearly unused on this dataset because scores are bimodal; it exists
-  for real-world conditions (lighting, masks, glasses) that LFW does not cover.
+- The 4% of same-person pairs that score below 0.25 were not inspected one by one; typical causes are extreme pose, large age
+  gaps, occlusion and, in LFW, occasional label noise. The review band is nearly unused on this dataset because scores are
+  bimodal; it exists for real-world conditions (lighting, masks, glasses) that LFW does not cover.
 - LFW is frontal-ish celebrity web photos. A hospital corridor camera, scrubs, masks and tired faces are harder. Expect worse
   numbers there and measure them before relying on this.
 - **No liveness detection.** The evaluation measures identity matching only; a photo or screen of an enrolled person is not tested and would pass.
