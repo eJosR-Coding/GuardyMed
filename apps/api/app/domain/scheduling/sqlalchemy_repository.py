@@ -149,6 +149,7 @@ class SQLAlchemySchedulingRepository:
             row = session.get(ShiftAssignmentRow, assignment.id)
             if row is None:
                 raise KeyError(assignment.id)
+            row.worker_id = assignment.worker_id
             row.start_time = assignment.start_time
             row.end_time = assignment.end_time
             row.notes = assignment.notes

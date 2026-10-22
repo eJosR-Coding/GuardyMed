@@ -21,6 +21,7 @@ class AuditAction:
     SCHEDULE_PERIOD_STATUS_UPDATED = "schedule_period.status_updated"
     ASSIGNMENT_CREATED = "assignment.created"
     ASSIGNMENT_UPDATED = "assignment.updated"
+    ASSIGNMENT_REASSIGNED = "assignment.reassigned"
     CHANGE_REQUEST_CREATED = "change_request.created"
     CHANGE_REQUEST_STATUS_UPDATED = "change_request.status_updated"
     CHANGE_REQUEST_REVIEWED = "change_request.reviewed"

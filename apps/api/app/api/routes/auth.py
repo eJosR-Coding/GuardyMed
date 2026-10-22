@@ -78,7 +78,7 @@ async def bootstrap_demo() -> DemoBootstrapRead:
         full_name="Demo Manager",
         password="password123",
         role=UserRole.MANAGER,
-        department_id=department_id,
+        department_id=None,  # organisation-wide: can see every department
     )
     worker = _pick_worker(worker_map)
     create_user(

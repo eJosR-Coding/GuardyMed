@@ -55,12 +55,12 @@ class SchedulingService:
     def __init__(self, repository: InMemorySchedulingRepository) -> None:
         self.repository = repository
 
-    def create_department(self, *, name: str, code: str) -> Department:
+    def create_department(self, *, name: str, code: str, actor_id: str = SYSTEM_ACTOR_ID) -> Department:
         ensure_unique_department_code({item.code.casefold() for item in self.repository.list_departments()}, code.casefold())
         department = Department(id=self._new_id("dep"), name=name, code=code)
         created = self.repository.create_department(department)
         self._record_event(
-            actor_id=SYSTEM_ACTOR_ID,
+            actor_id=actor_id,
             entity_type="department",
             entity_id=created.id,
             action=AuditAction.DEPARTMENT_CREATED,
@@ -78,6 +78,7 @@ class SchedulingService:
         document_id: str,
         worker_type: str,
         department_id: str,
+        actor_id: str = SYSTEM_ACTOR_ID,
     ) -> Worker:
         self._require_department(department_id)
         ensure_unique_worker_document(
@@ -93,7 +94,7 @@ class SchedulingService:
         )
         created = self.repository.create_worker(worker)
         self._record_event(
-            actor_id=SYSTEM_ACTOR_ID,
+            actor_id=actor_id,
             entity_type="worker",
             entity_id=created.id,
             action=AuditAction.WORKER_CREATED,
@@ -150,13 +151,19 @@ class SchedulingService:
             self._require_department(department_id)
         return self.repository.list_periods(department_id=department_id)
 
-    def update_period_status(self, period_id: str, *, status_value: SchedulePeriodStatus) -> SchedulePeriod:
+    def update_period_status(
+        self,
+        period_id: str,
+        *,
+        status_value: SchedulePeriodStatus,
+        actor_id: str = SYSTEM_ACTOR_ID,
+    ) -> SchedulePeriod:
         period = self.get_period(period_id)
         validate_schedule_period_status_transition(current_status=period.status, next_status=status_value)
         period.status = status_value
         updated = self.repository.update_period(period)
         self._record_event(
-            actor_id=SYSTEM_ACTOR_ID,
+            actor_id=actor_id,
             entity_type="schedule_period",
             entity_id=updated.id,
             action=AuditAction.SCHEDULE_PERIOD_STATUS_UPDATED,
@@ -174,6 +181,7 @@ class SchedulingService:
         start_time: time,
         end_time: time,
         notes: str | None,
+        actor_id: str = SYSTEM_ACTOR_ID,
     ) -> ShiftAssignment:
         period = self.get_period(period_id)
         worker = self._require_worker(worker_id)
@@ -198,7 +206,7 @@ class SchedulingService:
         )
         created = self.repository.create_assignment(assignment)
         self._record_event(
-            actor_id=SYSTEM_ACTOR_ID,
+            actor_id=actor_id,
             entity_type="assignment",
             entity_id=created.id,
             action=AuditAction.ASSIGNMENT_CREATED,
@@ -213,6 +221,7 @@ class SchedulingService:
         start_time: time,
         end_time: time,
         notes: str | None,
+        actor_id: str = SYSTEM_ACTOR_ID,
     ) -> ShiftAssignment:
         assignment = self.repository.get_assignment(assignment_id)
         if assignment is None:
@@ -233,7 +242,7 @@ class SchedulingService:
         assignment.notes = notes
         updated = self.repository.update_assignment(assignment)
         self._record_event(
-            actor_id=SYSTEM_ACTOR_ID,
+            actor_id=actor_id,
             entity_type="assignment",
             entity_id=updated.id,
             action=AuditAction.ASSIGNMENT_UPDATED,
@@ -272,7 +281,12 @@ class SchedulingService:
         if assignment.worker_id != requested_by:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker can only request changes for own assignments")
         if replacement_worker_id is not None:
-            self._require_worker(replacement_worker_id)
+            replacement = self._require_worker(replacement_worker_id)
+            if replacement.id == requested_by:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="replacement worker must be someone else")
+            requester = self._require_worker(requested_by)
+            if replacement.department_id != requester.department_id:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="replacement worker must belong to the same department")
         change_request = ChangeRequest(
             id=self._new_id("cr"),
             assignment_id=assignment.id,
@@ -335,9 +349,9 @@ class SchedulingService:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="decided_by is required")
 
         if target_type == ApprovalTargetType.SCHEDULE_PERIOD:
-            self._apply_schedule_period_decision(target_id, decision)
+            self._apply_schedule_period_decision(target_id, decision, decided_by.strip())
         elif target_type == ApprovalTargetType.CHANGE_REQUEST:
-            self._apply_change_request_decision(target_id, decision)
+            self._apply_change_request_decision(target_id, decision, decided_by.strip())
         else:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid approval target type")
 
@@ -615,27 +629,68 @@ class SchedulingService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="worker not found")
         return worker
 
-    def _apply_schedule_period_decision(self, period_id: str, decision: ApprovalDecisionType) -> None:
+    def _apply_schedule_period_decision(self, period_id: str, decision: ApprovalDecisionType, actor_id: str) -> None:
         period = self.get_period(period_id)
         period.status = next_schedule_period_status_from_decision(
             current_status=period.status,
             decision=decision,
         )
         self.repository.update_period(period)
+        self._record_event(
+            actor_id=actor_id,
+            entity_type="schedule_period",
+            entity_id=period.id,
+            action=AuditAction.SCHEDULE_PERIOD_STATUS_UPDATED,
+            payload={"status": period.status, "via": "approval_decision"},
+        )
 
-    def _apply_change_request_decision(self, request_id: str, decision: ApprovalDecisionType) -> None:
+    def _apply_change_request_decision(self, request_id: str, decision: ApprovalDecisionType, actor_id: str) -> None:
         change_request = self.get_change_request(request_id)
-        change_request.status = next_change_request_status_from_decision(
+        next_status = next_change_request_status_from_decision(
             current_status=change_request.status,
             decision=decision,
         )
+        # Apply the side effect first: if the replacement cannot take the shift the decision fails
+        # with a conflict and the request stays pending.
+        if (
+            next_status == ChangeRequestStatus.APPROVED
+            and change_request.replacement_worker_id
+            and change_request.request_type in {ChangeRequestType.SWAP, ChangeRequestType.REPLACEMENT}
+        ):
+            self._reassign_assignment(change_request.assignment_id, change_request.replacement_worker_id, actor_id)
+        change_request.status = next_status
         self.repository.update_change_request(change_request)
         self._record_event(
-            actor_id=SYSTEM_ACTOR_ID,
+            actor_id=actor_id,
             entity_type="change_request",
             entity_id=change_request.id,
             action=AuditAction.CHANGE_REQUEST_REVIEWED,
             payload={"status": change_request.status},
+        )
+
+    def _reassign_assignment(self, assignment_id: str, new_worker_id: str, actor_id: str) -> None:
+        assignment = self.get_assignment(assignment_id)
+        replacement = self._require_worker(new_worker_id)
+        period = self.get_period(assignment.schedule_period_id)
+        if replacement.department_id != period.department_id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="replacement worker must belong to the same department")
+        overlaps = any(
+            item.id != assignment.id
+            and item.shift_date == assignment.shift_date
+            and assignment.start_time < item.end_time
+            and assignment.end_time > item.start_time
+            for item in self.repository.list_assignments_for_worker(new_worker_id)
+        )
+        ensure_no_assignment_overlap(overlaps)
+        previous_worker_id = assignment.worker_id
+        assignment.worker_id = new_worker_id
+        self.repository.update_assignment(assignment)
+        self._record_event(
+            actor_id=actor_id,
+            entity_type="assignment",
+            entity_id=assignment.id,
+            action=AuditAction.ASSIGNMENT_REASSIGNED,
+            payload={"from_worker_id": previous_worker_id, "to_worker_id": new_worker_id},
         )
 
     def _record_event(

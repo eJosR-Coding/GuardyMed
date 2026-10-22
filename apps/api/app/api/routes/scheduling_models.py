@@ -57,6 +57,14 @@ class WorkerRead(WorkerCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ColleagueRead(BaseModel):
+    id: str
+    full_name: str
+    worker_type: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SchedulePeriodCreate(BaseModel):
     year: int
     month: int

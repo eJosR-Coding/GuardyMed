@@ -1,3 +1,14 @@
+import os
+import tempfile
+from pathlib import Path
+
+# Tests run against a throwaway SQLite file so they never touch a developer's guardymed.db.
+# This must be set before any `apps.api` module is imported.
+_TEST_DB_DIR = tempfile.mkdtemp(prefix="guardymed-tests-")
+os.environ["GUARDYMED_DATABASE_URL"] = f"sqlite+pysqlite:///{Path(_TEST_DB_DIR) / 'test.db'}"
+os.environ["GUARDYMED_PERSISTENCE_BACKEND"] = "sqlalchemy"
+os.environ["GUARDYMED_ATTENDANCE_CV_RUNTIME"] = "stub"
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
@@ -116,3 +127,18 @@ async def client():
     async with AsyncClient(transport=transport, base_url="http://testserver") as current:
         yield current
     reset_database()
+
+
+async def login_as_scoped_manager(client: AsyncClient, *, department_id: str, email: str = "scoped@guardymed.local") -> dict:
+    """Create (or reset) a manager limited to one department and sign in as them."""
+    from apps.api.app.api.auth import UserRole, create_user
+
+    create_user(
+        email=email,
+        full_name="Scoped Manager",
+        password="password123",
+        role=UserRole.MANAGER,
+        department_id=department_id,
+    )
+    await client.post("/api/v1/auth/logout")
+    return await login(client, email)

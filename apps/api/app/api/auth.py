@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -42,18 +43,25 @@ class SessionUser:
     is_active: bool
 
 
-def hash_password(password: str) -> str:
-    digest = hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        settings.password_salt.encode("utf-8"),
-        200_000,
-    )
-    return digest.hex()
+_PBKDF2_ITERATIONS = 200_000
+
+
+def hash_password(password: str, *, salt: str | None = None) -> str:
+    """Return ``pbkdf2_sha256$<iterations>$<salt>$<hex digest>`` with a random per-password salt."""
+    salt = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), _PBKDF2_ITERATIONS)
+    return f"pbkdf2_sha256${_PBKDF2_ITERATIONS}${salt}${digest.hex()}"
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return hmac.compare_digest(hash_password(password), password_hash)
+    try:
+        scheme, iterations, salt, expected = password_hash.split("$", 3)
+        if scheme != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), int(iterations))
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(digest.hex(), expected)
 
 
 def build_auth_context(user: SessionUser) -> AuthContext:
@@ -185,6 +193,15 @@ async def get_auth_context(
     return resolve_auth_context(session_id=session_id)
 
 
+def is_org_wide(auth: AuthContext) -> bool:
+    """A manager without a department is not limited to one department."""
+    return auth.role == UserRole.MANAGER and auth.department_id is None
+
+
+def can_access_department(auth: AuthContext, department_id: str) -> bool:
+    return is_org_wide(auth) or auth.department_id == department_id
+
+
 def require_roles(*allowed_roles: UserRole):
     async def guard(auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
         if auth.role not in allowed_roles:
@@ -200,7 +217,7 @@ def set_session_cookie(response: Response, session_id: str) -> None:
         value=session_id,
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=settings.session_cookie_secure,
         max_age=settings.session_ttl_hours * 3600,
         path="/",
     )

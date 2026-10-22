@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from apps.api.app.api.auth import AuthContext, UserRole, get_auth_context, require_roles
+from apps.api.app.api.auth import AuthContext, UserRole, can_access_department, get_auth_context, is_org_wide, require_roles
 from apps.api.app.api.routes.scheduling_models import (
     ApprovalDecisionCreate,
     ApprovalDecisionRead,
@@ -11,6 +11,7 @@ from apps.api.app.api.routes.scheduling_models import (
     AttendanceEnrollmentCreate,
     AttendanceEnrollmentRead,
     AuditEventRead,
+    ColleagueRead,
     ChangeRequestCreate,
     ChangeRequestListRead,
     ChangeRequestRead,
@@ -41,6 +42,7 @@ from apps.api.app.api.routes.scheduling_models import (
     WorkerRead,
 )
 from apps.api.app.domain.attendance_cv.bootstrap import workflow as attendance_cv_workflow
+from apps.api.app.core.errors import ApiError
 from apps.api.app.domain.scheduling import service
 
 router = APIRouter(prefix="/scheduling", tags=["scheduling"])
@@ -96,6 +98,8 @@ async def list_attendance_enrollments(
 ) -> list[AttendanceEnrollmentRead]:
     worker_id = _require_worker_identity(auth) if auth.role == UserRole.WORKER else None
     items = service.list_attendance_enrollments(worker_id=worker_id)
+    if auth.role == UserRole.MANAGER:
+        items = [item for item in items if can_access_department(auth, _worker_department_id(item.worker_id))]
     return [AttendanceEnrollmentRead.model_validate(item) for item in items]
 
 
@@ -172,7 +176,11 @@ async def list_attendance_attempts(
     if auth.role == UserRole.WORKER:
         items = service.list_attendance_attempts(worker_id=_require_worker_identity(auth))
     else:
-        items = service.list_attendance_attempts()
+        items = [
+            item
+            for item in service.list_attendance_attempts()
+            if can_access_department(auth, _worker_department_id(item.worker_id))
+        ]
     return [AttendanceAttemptRead.model_validate(item) for item in items]
 
 
@@ -180,7 +188,11 @@ async def list_attendance_attempts(
 async def list_attendance_review_queue(
     auth: AuthContext = Depends(require_roles(UserRole.MANAGER)),
 ) -> list[AttendanceAttemptRead]:
-    items = service.list_attendance_attempts(pending_only=True)
+    items = [
+        item
+        for item in service.list_attendance_attempts(pending_only=True)
+        if can_access_department(auth, _worker_department_id(item.worker_id))
+    ]
     return [AttendanceAttemptRead.model_validate(item) for item in items]
 
 
@@ -205,18 +217,19 @@ async def review_attendance_attempt(
 @router.post("/departments", response_model=DepartmentRead, status_code=status.HTTP_201_CREATED)
 async def create_department(
     payload: DepartmentCreate,
-    _: AuthContext = Depends(require_roles(UserRole.MANAGER)),
+    auth: AuthContext = Depends(require_roles(UserRole.MANAGER)),
 ) -> DepartmentRead:
-    return DepartmentRead.model_validate(service.create_department(name=payload.name, code=payload.code))
+    if not is_org_wide(auth):
+        raise _forbidden("only organisation-wide managers can create departments")
+    department = service.create_department(name=payload.name, code=payload.code, actor_id=auth.user_id)
+    return DepartmentRead.model_validate(department)
 
 
 @router.get("/departments", response_model=list[DepartmentRead])
 async def list_departments(
     auth: AuthContext = Depends(get_auth_context),
 ) -> list[DepartmentRead]:
-    items = service.list_departments()
-    if auth.role == UserRole.WORKER and auth.department_id:
-        items = [item for item in items if item.id == auth.department_id]
+    items = [item for item in service.list_departments() if can_access_department(auth, item.id)]
     return [DepartmentRead.model_validate(item) for item in items]
 
 
@@ -231,6 +244,7 @@ async def create_worker(
         document_id=payload.document_id,
         worker_type=payload.worker_type,
         department_id=payload.department_id,
+        actor_id=auth.user_id,
     )
     return WorkerRead.model_validate(worker)
 
@@ -244,9 +258,21 @@ async def list_workers(
         worker_id = _require_worker_identity(auth)
         worker = next(item for item in service.list_workers() if item.id == worker_id)
         return [WorkerRead.model_validate(worker)]
-    effective_department_id = department_id or (auth.department_id if auth.role == UserRole.WORKER else None)
+    if department_id is not None:
+        _require_department_access(auth, department_id)
+    effective_department_id = department_id or auth.department_id
     items = service.list_workers(department_id=effective_department_id)
     return [WorkerRead.model_validate(item) for item in items]
+
+
+@router.get("/colleagues", response_model=list[ColleagueRead])
+async def list_colleagues(
+    auth: AuthContext = Depends(require_roles(UserRole.WORKER)),
+) -> list[ColleagueRead]:
+    """Names of the other workers in the caller's department (no personal documents), for picking a replacement."""
+    own_id = _require_worker_identity(auth)
+    items = service.list_workers(department_id=auth.department_id) if auth.department_id else []
+    return [ColleagueRead.model_validate(item) for item in items if item.id != own_id]
 
 
 @router.post("/schedule-periods", response_model=SchedulePeriodRead, status_code=status.HTTP_201_CREATED)
@@ -269,7 +295,9 @@ async def list_schedule_periods(
     department_id: str | None = None,
     auth: AuthContext = Depends(get_auth_context),
 ) -> SchedulePeriodListRead:
-    effective_department_id = department_id or (auth.department_id if auth.role == UserRole.WORKER else None)
+    if department_id is not None:
+        _require_department_access(auth, department_id)
+    effective_department_id = department_id or auth.department_id
     return SchedulePeriodListRead(
         items=[SchedulePeriodRead.model_validate(item) for item in service.list_periods(department_id=effective_department_id)]
     )
@@ -293,7 +321,8 @@ async def update_schedule_period(
 ) -> SchedulePeriodRead:
     period = service.get_period(period_id)
     _require_department_access(auth, period.department_id)
-    return SchedulePeriodRead.model_validate(service.update_period_status(period_id, status_value=payload.status))
+    updated = service.update_period_status(period_id, status_value=payload.status, actor_id=auth.user_id)
+    return SchedulePeriodRead.model_validate(updated)
 
 
 @router.post(
@@ -316,6 +345,7 @@ async def create_shift_assignment(
         start_time=payload.start_time,
         end_time=payload.end_time,
         notes=payload.notes,
+        actor_id=auth.user_id,
     )
     return ShiftAssignmentRead.model_validate(assignment)
 
@@ -334,6 +364,7 @@ async def update_shift_assignment(
         start_time=payload.start_time,
         end_time=payload.end_time,
         notes=payload.notes,
+        actor_id=auth.user_id,
     )
     return ShiftAssignmentRead.model_validate(assignment)
 
@@ -355,6 +386,8 @@ async def list_worker_assignments(
     auth: AuthContext = Depends(get_auth_context),
 ) -> ShiftAssignmentListRead:
     _require_worker_access(auth, worker_id)
+    if auth.role == UserRole.MANAGER:
+        _require_department_access(auth, _worker_department_id(worker_id))
     assignments = service.list_assignments_for_worker(worker_id)
     return ShiftAssignmentListRead(items=[ShiftAssignmentRead.model_validate(item) for item in assignments])
 
@@ -388,6 +421,8 @@ async def get_change_request(
     change_request = service.get_change_request(request_id)
     if auth.role == UserRole.WORKER and change_request.requested_by != _require_worker_identity(auth):
         raise _forbidden()
+    if auth.role == UserRole.MANAGER:
+        _require_department_access(auth, _change_request_department_id(change_request))
     return ChangeRequestRead.model_validate(change_request)
 
 
@@ -400,6 +435,8 @@ async def list_change_requests(
     if auth.role == UserRole.WORKER:
         effective_requested_by = _require_worker_identity(auth)
     requests = service.list_change_requests(requested_by=effective_requested_by)
+    if auth.role == UserRole.MANAGER:
+        requests = [item for item in requests if can_access_department(auth, _change_request_department_id(item))]
     return ChangeRequestListRead(items=[ChangeRequestRead.model_validate(item) for item in requests])
 
 
@@ -424,7 +461,15 @@ async def update_change_request(
 async def get_review_queue(
     auth: AuthContext = Depends(require_roles(UserRole.MANAGER)),
 ) -> ReviewQueueRead:
-    return ReviewQueueRead.model_validate(service.list_review_queue())
+    queue = service.list_review_queue()
+    return ReviewQueueRead.model_validate(
+        {
+            "schedule_periods": [item for item in queue["schedule_periods"] if can_access_department(auth, item.department_id)],
+            "change_requests": [
+                item for item in queue["change_requests"] if can_access_department(auth, _change_request_department_id(item))
+            ],
+        }
+    )
 
 
 @router.post("/approval-decisions", response_model=ApprovalDecisionRead, status_code=status.HTTP_201_CREATED)
@@ -444,7 +489,7 @@ async def create_approval_decision(
         target_type=payload.target_type,
         target_id=payload.target_id,
         decision=payload.decision,
-        decided_by=payload.decided_by or auth.user_id,
+        decided_by=auth.user_id,
         comment=payload.comment,
     )
     return ApprovalDecisionRead.model_validate(decision)
@@ -456,7 +501,9 @@ async def list_audit_events(
     entity_id: str | None = None,
     auth: AuthContext = Depends(require_roles(UserRole.MANAGER)),
 ) -> list[AuditEventRead]:
-    return [AuditEventRead.model_validate(item) for item in service.list_audit_events(entity_type=entity_type, entity_id=entity_id)]
+    events = service.list_audit_events(entity_type=entity_type, entity_id=entity_id)
+    visible = [item for item in events if is_org_wide(auth) or _event_department_id(item) in {auth.department_id, None}]
+    return [AuditEventRead.model_validate(item) for item in visible]
 
 
 @router.post("/schedule-periods/{period_id}/exports", response_model=ExportRead, status_code=status.HTTP_201_CREATED)
@@ -498,6 +545,49 @@ async def get_export(
 
 
 def _require_department_access(auth: AuthContext, department_id: str) -> None:
+    if not can_access_department(auth, department_id):
+        raise _forbidden("not allowed to access another department")
+
+
+def _worker_department_id(worker_id: str) -> str:
+    return service._require_worker(worker_id).department_id
+
+
+def _assignment_department_id(assignment_id: str) -> str:
+    return service.get_period(service.get_assignment(assignment_id).schedule_period_id).department_id
+
+
+def _change_request_department_id(change_request) -> str:
+    return _assignment_department_id(change_request.assignment_id)
+
+
+def _event_department_id(event) -> str | None:
+    """Best-effort department of an audit event's subject; None when it cannot be resolved (global events)."""
+    try:
+        if event.entity_type == "department":
+            return event.entity_id
+        if event.entity_type == "worker":
+            return _worker_department_id(event.entity_id)
+        if event.entity_type == "schedule_period":
+            return service.get_period(event.entity_id).department_id
+        if event.entity_type == "assignment":
+            return _assignment_department_id(event.entity_id)
+        if event.entity_type == "change_request":
+            return _change_request_department_id(service.get_change_request(event.entity_id))
+        if event.entity_type == "attendance_attempt":
+            return _assignment_department_id(service.get_attendance_attempt(event.entity_id).assignment_id)
+        if event.entity_type == "attendance_enrollment":
+            worker_id = event.payload.get("worker_id")
+            return _worker_department_id(str(worker_id)) if worker_id else None
+        if event.entity_type == "export_job":
+            return service.get_period(str(event.payload.get("schedule_period_id"))).department_id
+        if event.entity_type == "approval_decision":
+            target_id = str(event.payload.get("target_id"))
+            if event.payload.get("target_type") == "schedule_period":
+                return service.get_period(target_id).department_id
+            return _change_request_department_id(service.get_change_request(target_id))
+    except HTTPException:
+        return None
     return None
 
 
@@ -512,7 +602,5 @@ def _require_worker_access(auth: AuthContext, worker_id: str) -> None:
         raise _forbidden()
 
 
-def _forbidden(detail: str = "forbidden"):
-    from fastapi import HTTPException, status
-
-    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+def _forbidden(detail: str = "forbidden") -> HTTPException:
+    return ApiError(status.HTTP_403_FORBIDDEN, detail, code="forbidden")

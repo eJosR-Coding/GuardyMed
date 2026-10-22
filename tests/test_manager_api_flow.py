@@ -108,7 +108,9 @@ async def test_worker_cannot_create_request_for_someone_elses_assignment(client:
 
 @pytest.mark.anyio
 async def test_manager_can_review_period_and_export_after_approval(client: AsyncClient) -> None:
-    manager = await seed_and_login(client, "manager@guardymed.local")
+    await seed_and_login(client, "manager@guardymed.local")
+    departments = await client.get("/api/v1/scheduling/departments")
+    department_id = departments.json()[0]["id"]
 
     worker = await client.post(
         "/api/v1/scheduling/workers",
@@ -116,7 +118,7 @@ async def test_manager_can_review_period_and_export_after_approval(client: Async
             "full_name": "Rosa Diaz",
             "document_id": "90909090",
             "worker_type": "Nurse",
-            "department_id": manager["department_id"],
+            "department_id": department_id,
         },
     )
     assert worker.status_code == 201, worker.text
@@ -125,9 +127,9 @@ async def test_manager_can_review_period_and_export_after_approval(client: Async
     period = await client.post(
         "/api/v1/scheduling/schedule-periods",
         json={
-            "year": 2026,
+            "year": 2030,
             "month": 10,
-            "department_id": manager["department_id"],
+            "department_id": department_id,
         },
     )
     assert period.status_code == 201, period.text
@@ -138,7 +140,7 @@ async def test_manager_can_review_period_and_export_after_approval(client: Async
         json={
             "worker_id": worker_id,
             "assignment_type": "guard_shift",
-            "shift_date": "2026-10-03",
+            "shift_date": "2030-10-03",
             "start_time": "08:00:00",
             "end_time": "20:00:00",
             "notes": "Manager-visible coverage",
