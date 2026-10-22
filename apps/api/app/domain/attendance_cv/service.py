@@ -27,7 +27,7 @@ class AttendanceCVService:
         runtime: FaceEmbeddingRuntime | None = None,
         *,
         threshold_accept: float = 0.45,
-        threshold_review: float = 0.30,
+        threshold_review: float = 0.25,
     ) -> None:
         if threshold_review > threshold_accept:
             raise ValueError("review threshold cannot be above the accept threshold")

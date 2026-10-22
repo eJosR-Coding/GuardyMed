@@ -141,7 +141,7 @@ async function sendRequest() {
           </button>
         </div>
       </div>
-      <p v-if="nextAction && !nextAction.today" class="hint" style="padding: 0 24px 16px">Check-in opens on the day of the shift.</p>
+      <p v-if="nextAction?.type && !nextAction.today" class="hint" style="padding: 0 24px 16px">Check-in opens on the day of the shift.</p>
     </section>
     <Empty v-else title="No upcoming shifts">When a manager schedules you, your shifts show up here.</Empty>
 

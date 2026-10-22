@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "guardymed-api"
 version = "0.2.0"
-description = "GuardyMed AI-first FastAPI phase 1 skeleton"
+description = "GuardyMed: guard scheduling, worker requests and face-verified attendance for hospital teams (FastAPI + Vue)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

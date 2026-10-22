@@ -23,3 +23,4 @@ legacy/django-demo/__pycache__/
 legacy/django-demo/guardymed.egg-info/
 
 .codegraph/
+.cache/

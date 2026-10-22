@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # Cosine-similarity routing thresholds. Defaults are calibrated for the InsightFace
     # buffalo_l model (see docs/AI_SERVICES.md); the stub runtime ignores them semantically.
     attendance_cv_accept_threshold: float = 0.45
-    attendance_cv_review_threshold: float = 0.30
+    attendance_cv_review_threshold: float = 0.25
     attendance_cv_min_quality: float = 0.5
     # Where InsightFace caches model weights (default: ~/.insightface). Weights are never stored in this repo.
     attendance_cv_model_root: str | None = None

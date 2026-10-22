@@ -207,18 +207,17 @@ async function createExport() {
           </div>
         </div>
 
-        <div class="cal" role="grid" :aria-label="`${monthLabel(period)} shifts`">
-          <div v-for="d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="d" class="cal-dow" role="columnheader">{{ d }}</div>
+        <div class="cal" role="group" :aria-label="`${monthLabel(period)} shifts, choose a day`">
+          <div v-for="d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="d" class="cal-dow" aria-hidden="true">{{ d }}</div>
           <template v-for="(day, i) in cells" :key="day || `blank-${i}`">
-            <div v-if="!day" class="cal-day is-outside" role="gridcell" />
+            <div v-if="!day" class="cal-day is-outside" aria-hidden="true" />
             <button
               v-else
               class="cal-day"
               :class="{ 'is-selected': day === selectedDay, 'is-today': day === todayIso }"
               type="button"
-              role="gridcell"
               :aria-label="`${fmtDay(day)}, ${(byDay[day] || []).length} shifts`"
-              :aria-selected="day === selectedDay"
+              :aria-pressed="day === selectedDay"
               @click="selectedDay = day"
             >
               <span class="cal-date">{{ Number(day.slice(8)) }}</span>

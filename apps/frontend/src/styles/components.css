@@ -723,7 +723,7 @@ dialog.dialog::backdrop {
   position: relative;
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(to right, var(--bad-tint) var(--review), var(--warn-tint) var(--review) var(--accept), var(--ok-tint) var(--accept));
+  background: linear-gradient(to right, #f3c9c3 var(--review), #f1d49b var(--review) var(--accept), #b9dcc4 var(--accept));
   border: 1px solid var(--line-strong);
   margin-top: var(--space-2);
 }
