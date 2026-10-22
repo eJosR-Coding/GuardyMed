@@ -13,6 +13,7 @@ from apps.api.app.api.auth import (
     delete_session,
     get_auth_context,
     get_user_by_email,
+    resolve_auth_context,
     require_roles,
     set_session_cookie,
     verify_password,
@@ -79,7 +80,7 @@ async def bootstrap_demo() -> DemoBootstrapRead:
 
     create_user(
         email="manager@guardymed.local",
-        full_name="Demo Manager",
+        full_name="Elena Cruz",
         password="password123",
         role=UserRole.MANAGER,
         department_id=None,  # organisation-wide: can see every department
@@ -119,7 +120,7 @@ async def login(payload: LoginRequest, response: Response) -> SessionRead:
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     response: Response,
-    session_id: str | None = Cookie(default=None, alias="guardymed_session"),
+    session_id: str | None = Cookie(default=None, alias=settings.session_cookie_name),
     auth: AuthContext = Depends(get_auth_context),
 ) -> Response:
     if session_id:
@@ -127,6 +128,22 @@ async def logout(
     clear_session_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+class SessionStatusRead(BaseModel):
+    user: SessionRead | None
+
+
+@router.get("/status", response_model=SessionStatusRead)
+async def session_status(
+    session_id: str | None = Cookie(default=None, alias=settings.session_cookie_name),
+) -> SessionStatusRead:
+    """Like ``/session`` but always 200: ``user`` is null when nobody is signed in (used by the web app on load)."""
+    try:
+        auth = resolve_auth_context(session_id=session_id)
+    except HTTPException:
+        return SessionStatusRead(user=None)
+    return SessionStatusRead(user=SessionRead.model_validate(asdict(auth)))
 
 
 @router.get("/session", response_model=SessionRead)

@@ -1,3 +1,4 @@
+import pytest
 from fastapi import HTTPException
 
 from apps.api.app.api.auth import (
@@ -111,3 +112,16 @@ def test_auth_and_app_routes_are_registered() -> None:
     assert "/api/v1/scheduling/attendance/attempts" in paths
     assert "/app" in paths
     assert "/" in paths
+
+
+@pytest.mark.anyio
+async def test_session_status_is_always_200(client) -> None:
+    anonymous = await client.get("/api/v1/auth/status")
+    assert anonymous.status_code == 200
+    assert anonymous.json() == {"user": None}
+
+    await client.post("/api/v1/auth/bootstrap-demo")
+    await client.post("/api/v1/auth/login", json={"email": "worker@guardymed.local", "password": "password123"})
+    signed_in = await client.get("/api/v1/auth/status")
+
+    assert signed_in.json()["user"]["role"] == "worker"

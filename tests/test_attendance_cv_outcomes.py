@@ -239,3 +239,16 @@ async def test_demo_bootstrap_enrolls_the_demo_worker_so_check_in_works_immediat
     )
     assert verify.status_code == 201, verify.text
     assert verify.json()["match_result"]["outcome"] == "verified"
+
+
+@pytest.mark.anyio
+async def test_manager_lists_face_templates_without_embeddings(client: AsyncClient) -> None:
+    await _enroll_demo_worker(client)
+
+    response = await client.get(f"{BASE}/attendance/cv/enrollments")
+
+    assert response.status_code == 200, response.text
+    templates = response.json()
+    assert len(templates) == 1
+    assert "embedding" not in templates[0] and "embedding_json" not in templates[0]
+    assert templates[0]["is_demo_runtime"] is True

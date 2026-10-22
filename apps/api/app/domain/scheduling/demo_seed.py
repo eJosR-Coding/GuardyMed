@@ -114,7 +114,12 @@ def seed(service: SchedulingService, today: date | None = None) -> dict[str, int
 
     # One attendance attempt waiting for review (manual evidence, no face match).
     service.create_attendance_enrollment(worker_id=marta.id, created_by=DEMO_ACTOR_ID)
-    marta_shift = next(item for item in service.repository.list_assignments_for_period(current.id) if item.worker_id == marta.id)
+    marta_shifts = sorted(
+        (item for item in service.repository.list_assignments_for_period(current.id) if item.worker_id == marta.id),
+        key=lambda item: item.shift_date,
+    )
+    # The most recent shift that has already started (or the first one early in the month).
+    marta_shift = next((item for item in reversed(marta_shifts) if item.shift_date <= today), marta_shifts[0])
     service.create_attendance_enrollment(worker_id=ana.id, created_by=DEMO_ACTOR_ID)
     service.create_attendance_attempt(
         worker_id=marta.id,

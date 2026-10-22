@@ -36,3 +36,14 @@ async def test_validation_errors_list_the_offending_fields(client: AsyncClient) 
     assert body["code"] == "validation_error"
     assert {item["field"] for item in body["fields"]} == {"name", "code"}
     assert body["detail"].startswith("Validation failed:")
+
+
+@pytest.mark.anyio
+async def test_health_reports_version_and_demo_mode(client: AsyncClient) -> None:
+    response = await client.get("/health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["demo_mode"] is True
+    assert body["version"] == open("VERSION").read().strip()

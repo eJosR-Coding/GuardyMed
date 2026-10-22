@@ -25,6 +25,7 @@ def build_runtime() -> RuntimeSelection:
             runtime = InsightFaceEmbeddingRuntime(
                 model_name=settings.attendance_cv_model_name,
                 min_quality=settings.attendance_cv_min_quality,
+                model_root=settings.attendance_cv_model_root,
             )
             return RuntimeSelection(runtime=runtime, requested=requested)
         except Exception as exc:  # model download blocked, missing extra, unsupported platform...

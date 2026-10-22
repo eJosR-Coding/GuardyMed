@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     attendance_cv_accept_threshold: float = 0.45
     attendance_cv_review_threshold: float = 0.30
     attendance_cv_min_quality: float = 0.5
+    # Where InsightFace caches model weights (default: ~/.insightface). Weights are never stored in this repo.
+    attendance_cv_model_root: str | None = None
 
     model_config = SettingsConfigDict(env_prefix="GUARDYMED_", extra="ignore")
 

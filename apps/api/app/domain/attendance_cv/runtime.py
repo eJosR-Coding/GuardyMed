@@ -92,7 +92,7 @@ class InsightFaceEmbeddingRuntime:
     is_demo = False
     detector_name = "insightface-retinaface"
 
-    def __init__(self, *, model_name: str = "buffalo_l", min_quality: float = 0.5) -> None:
+    def __init__(self, *, model_name: str = "buffalo_l", min_quality: float = 0.5, model_root: str | None = None) -> None:
         try:
             import cv2
             import numpy as np
@@ -107,6 +107,7 @@ class InsightFaceEmbeddingRuntime:
         # Detection + recognition only: landmarks and gender/age models are not needed and slow start-up.
         self._app = FaceAnalysis(
             name=model_name,
+            root=model_root or "~/.insightface",
             providers=["CPUExecutionProvider"],
             allowed_modules=["detection", "recognition"],
         )

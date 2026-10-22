@@ -101,6 +101,21 @@ async def face_runtime_status(
     )
 
 
+@router.get("/attendance/cv/enrollments", response_model=list[FaceTemplateRead])
+async def list_face_templates(
+    auth: AuthContext = Depends(require_roles(UserRole.MANAGER)),
+) -> list[FaceTemplateRead]:
+    """Latest face template (metadata only, never the embedding) for each worker the manager can see."""
+    templates = []
+    for worker in service.list_workers():
+        if not can_access_department(auth, worker.department_id):
+            continue
+        template = attendance_cv_workflow.repository.get_latest_template_for_worker(worker.id)
+        if template is not None:
+            templates.append(FaceTemplateRead.model_validate(template))
+    return templates
+
+
 @router.post("/demo/seed", response_model=DemoSeedRead)
 async def seed_demo_data(
     _: AuthContext = Depends(require_roles(UserRole.MANAGER)),
